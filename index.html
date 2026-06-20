@@ -1394,33 +1394,59 @@ function __splashGo() {
   } catch(e) {}
 }
 
-// Reset splash quando si esce dal fullscreen o si cambia app
+// Reset splash — logica corretta per iOS Safari
 (function() {
-  function __maybeReset() {
-    var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    // Grace period 5s: evita che iOS rimostri la splash subito dopo il tap
-    if (__splashDone && (Date.now() - __splashAt) > 5000 && !isFs) {
-      var splash = document.getElementById('splash');
-      if (splash) splash.style.display = 'flex';
-      __splashDone = false;
-    }
+  var __needsReload = false;   // se true: il prossimo play fa reload pulito
+  var __wasHidden   = false;   // traccia se la pagina era DAVVERO nascosta
+
+  function __showSplash() {
+    var splash = document.getElementById('splash');
+    if (splash) splash.style.display = 'flex';
+    __splashDone  = false;
+    __needsReload = true;  // prossimo play → reload
   }
 
-  ['fullscreenchange','webkitfullscreenchange'].forEach(function(e) {
-    document.addEventListener(e, __maybeReset);
+  // fullscreenchange: Android esce dal fullscreen → mostra splash
+  ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev) {
+    document.addEventListener(ev, function() {
+      var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs && __splashDone) __showSplash();
+    });
   });
 
+  // visibilitychange: SOLO se la pagina era davvero nascosta prima
+  // (esclude le false attivazioni dell'animazione barra URL di iOS)
   document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) __maybeReset();
-  });
-
-  window.addEventListener('pageshow', function(e) {
-    if (e.persisted) {
-      var splash = document.getElementById('splash');
-      if (splash) splash.style.display = 'flex';
-      __splashDone = false;
+    if (document.hidden) {
+      __wasHidden = true;   // pagina nascosta per davvero (home button, cambio app)
+    } else if (__wasHidden && __splashDone) {
+      __wasHidden = false;
+      __showSplash();       // utente è tornato dopo aver davvero lasciato l'app
+    } else {
+      __wasHidden = false;  // reset se visible senza hidden precedente (barra URL iOS)
     }
   });
+
+  // pageshow: ripristino da bfcache → reload diretto
+  window.addEventListener('pageshow', function(e) {
+    if (e.persisted) location.reload();
+  });
+
+  // Patch __splashGo: se needsReload → reload invece di nascondere la splash
+  var _origGo = window.__splashGo;
+  window.__splashGo = function() {
+    if (__splashDone) return;
+    if (__needsReload) { location.reload(); return; }
+    __splashDone = true;
+    __splashAt   = Date.now();
+    var splash = document.getElementById('splash');
+    if (splash) splash.style.display = 'none';
+    try {
+      var el = document.documentElement;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+      if (req) { var p = req.call(el); if (p && p.catch) p.catch(function(){}); }
+    } catch(e) {}
+  };
 })();
 
 // ================================================================
