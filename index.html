@@ -107,9 +107,9 @@
 
     /* ── FEED (comune) ── */
     .feed-view { padding:0; align-items:stretch; }
-    .feed-container { position:relative; width:100%; overflow:hidden; flex:1; min-height:0; }
-    .slides-wrapper { position:absolute; top:0; left:0; right:0; will-change:transform; transition:transform .28s cubic-bezier(.4,0,.2,1); }
-    .video-slide { position:relative; width:100%; height:100vh; height:100dvh; height:var(--slide-h,100svh); overflow:hidden; background:#111; }
+    .feed-container { position:relative; width:100%; overflow:hidden; flex:1; min-height:0; touch-action:none; overscroll-behavior:none; }
+    .slides-wrapper { position:absolute; top:0; left:0; right:0; will-change:transform; transition:transform .28s cubic-bezier(.4,0,.2,1); touch-action:none; }
+    .video-slide { position:relative; width:100%; height:100vh; height:100dvh; height:var(--slide-h,100svh); overflow:hidden; background:#111; touch-action:none; }
 
     /* ── SLIDE IMMAGINE ── */
     /* Immagine/video di sfondo */
@@ -1184,9 +1184,13 @@ function makeSwiper(container, slidesEl, getCount, onArrive) {
   container.addEventListener('mouseleave', function() { _mDragging = false; });
 
   // ── RESIZE: ricalibra posizione ───────────────────────────────────────
+  // Resize: solo se l'altezza è davvero cambiata (es. orientamento)
   window.addEventListener('resize', function() {
     var h = getH();
-    if (h > 0) {
+    var prevH = window._SLIDE_H || h;
+    if (h > 0 && Math.abs(h - prevH) > 5) {
+      window._SLIDE_H = h;
+      document.documentElement.style.setProperty('--slide-h', h + 'px');
       slidesEl.style.transition = 'none';
       slidesEl.style.transform  = 'translateY(-' + (idx * h) + 'px)';
       setTimeout(function(){ slidesEl.style.transition = ''; }, 100);
@@ -1450,11 +1454,11 @@ function initSpettFeed(code) {
     // Mago: entra nel feed con il codice sessione
     initMagoFeed(_m, codeToTopic(_m));
     // Auto-dismiss splash dopo 900ms (utile se la pagina si è ricaricata)
-    setTimeout(function() { if (!__splashDone) __splashGo(); }, 900);
+    setTimeout(function() { if (!__splashDone) __splashGo(); }, 200);
   } else if (_s.length === 4) {
     // Spettatore: entra nel feed condiviso
     initSpettFeed(_s);
-    setTimeout(function() { if (!__splashDone) __splashGo(); }, 900);
+    setTimeout(function() { if (!__splashDone) __splashGo(); }, 200);
   } else {
     // Home del mago
     showView('view-home');
@@ -1483,30 +1487,43 @@ function __splashGo() {
   var splash = document.getElementById('splash');
   if (splash) splash.style.display = 'none';
 
-  // Fullscreen — tutto in try/catch (iOS non lo supporta)
-  try {
-    var el  = document.documentElement;
-    var req = el.requestFullscreen
-           || el.webkitRequestFullscreen
-           || el.mozRequestFullScreen
-           || el.msRequestFullscreen;
-    if (req) { var p = req.call(el); if (p && p.catch) p.catch(function(){}); }
-  } catch(e) {}
+  // Fullscreen solo su Android — su iOS Safari il fullscreenchange
+  // viene emesso durante lo scroll (URL bar show/hide) → la splash ricompare.
+  // Rilevamento iOS: userAgent o MacIntel + touch (iPad)
+  var _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!_isIOS) {
+    try {
+      var el  = document.documentElement;
+      var req = el.requestFullscreen
+             || el.webkitRequestFullscreen
+             || el.mozRequestFullScreen
+             || el.msRequestFullscreen;
+      if (req) { var p = req.call(el); if (p && p.catch) p.catch(function(){}); }
+    } catch(e) {}
+  }
 }
 
 // Reset splash: solo su fullscreenchange (Android) e pageshow bfcache
 // NON gestiamo visibilitychange — causa falsi positivi su iOS con animazione barra URL
 (function() {
-  // Android fullscreen exit → mostra splash
-  ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev) {
-    document.addEventListener(ev, function() {
-      var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      if (!isFs && __splashDone) {
-        document.getElementById('splash').style.display = 'flex';
-        __splashDone = false;
-      }
+  // Android fullscreen exit → mostra splash (solo su Android, non iOS)
+  // Su iOS il fullscreenchange viene emesso durante lo scroll → NON gestiamo
+  var _isIOS2 = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!_isIOS2) {
+    ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev) {
+      document.addEventListener(ev, function() {
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        // Non mostrare splash se siamo in una sessione mago o spettatore
+        var inSession = location.search.indexOf('m=') >= 0 || location.search.indexOf('s=') >= 0;
+        if (!isFs && __splashDone && !inSession) {
+          document.getElementById('splash').style.display = 'flex';
+          __splashDone = false;
+        }
+      });
     });
-  });
+  }
 
   // pageshow rimosso: auto-dismiss gestisce il ritorno
 })();
@@ -1566,6 +1583,13 @@ function _rndK(min,max) { return (min + Math.random()*(max-min)).toFixed(1)+'K';
 function initFakeInteractions(container, slidesEl) {
   const burst = document.getElementById('heart-burst');
   let lastTap = 0, lastTapX = 0, lastTapY = 0;
+  var _tapStartX = 0, _tapStartY = 0; // per distinguere tap da swipe
+
+  // Registra punto di partenza del touch
+  container.addEventListener('touchstart', function(e) {
+    _tapStartX = e.touches[0].clientX;
+    _tapStartY = e.touches[0].clientY;
+  }, { passive: true });
 
   function curSlide() {
     var s = slidesEl.querySelector('.video-slide');
@@ -1656,13 +1680,22 @@ function initFakeInteractions(container, slidesEl) {
   }
 
   // touchend: singolo tap = interazione, doppio tap = cuore
-  // touchend: singolo tap = interazione, doppio tap = cuore
   container.addEventListener('touchend', function(e) {
     var t = e.changedTouches[0];
+
+    // Se il dito si è spostato > 15px era uno swipe, non un tap — ignora tutto
+    var travelX = Math.abs(t.clientX - _tapStartX);
+    var travelY = Math.abs(t.clientY - _tapStartY);
+    if (travelY > 15 || travelX > 15) {
+      // Reset lastTap: uno swipe non deve contribuire al doppio-tap successivo
+      lastTap = 0;
+      return;
+    }
+
     var now = Date.now();
-    var isDouble = (now - lastTap) < 200                        // max 200ms tra i due tap
-                && Math.abs(t.clientX - lastTapX) < 30          // stesso punto X (±30px)
-                && Math.abs(t.clientY - lastTapY) < 30;         // stesso punto Y (±30px)
+    var isDouble = (now - lastTap) < 300                        // max 300ms tra i due tap
+                && Math.abs(t.clientX - lastTapX) < 40          // stesso punto X (±40px)
+                && Math.abs(t.clientY - lastTapY) < 40;         // stesso punto Y (±40px)
     lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY;
 
     if (isDouble) {
