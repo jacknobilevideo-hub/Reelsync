@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Reels</title><!-- titolo neutro -->
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    html,body { height:100%; overflow:hidden; background:#000; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#fff; overscroll-behavior:none; touch-action:manipulation; }
+    .feed-container { overscroll-behavior:none; overflow:hidden; }
+    /* Touch-action:none sui container feed → nessun gesto nativo (zoom, scroll) */
+    .feed-container { touch-action:manipulation; -ms-touch-action:manipulation; }
+    /* Contain migliora le performance GPU per le slide */
+    .video-slide { /* contain rimosso */ flex-shrink:0; }
+    /* translateZ(0) rimosso: causava OOM GPU su iOS con 65+ slide */
+    /* ── DESKTOP / TABLET: frame telefono centrato ─────────────────── */
+    #phone-root { position:fixed; inset:0; }
+
+    @media (min-width: 600px) {
+      html, body {
+        background:#0d0d0d !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        height:100% !important;
+        overflow:hidden !important;
+      }
+      #phone-root {
+        position:relative !important;
+        inset:auto !important;
+        width:393px !important;
+        height:min(852px,96vh) !important;
+        overflow:hidden;
+        border-radius:44px;
+        transform:translateZ(0); /* fa sì che position:fixed figli siano relativi a phone-root */
+        isolation:isolate;
+        box-shadow:
+          0 0 0 1px #555,
+          0 0 0 11px #1c1c1e,
+          0 0 0 12px #3a3a3c,
+          0 28px 90px rgba(0,0,0,.95);
+      }
+      .tk-action, .nav-plus, .open-btn, .num-btn,
+      .close-btn, .exit-btn, .activate-btn, .perf-btn { cursor:pointer !important; }
+      #phone-root::after {
+        content:'↕ Rotella o drag per scorrere · Doppio-click per like';
+        position:absolute; bottom:-26px; left:50%;
+        transform:translateX(-50%);
+        color:rgba(255,255,255,.25); font-size:11px;
+        white-space:nowrap; pointer-events:none;
+        font-family:-apple-system,sans-serif;
+      }
+    }
+
+    .view { display:none; position:fixed; inset:0; flex-direction:column; align-items:center; justify-content:center; }
+    .view.active { display:flex; }
+
+    /* ── MAGO HOME ── */
+    #view-home { background:radial-gradient(ellipse at 50% 20%, #1a0010 0%, #000 70%); padding:40px 28px; }
+    .logo { font-size:40px; font-weight:900; letter-spacing:-1px; margin-bottom:6px; }
+    .logo span { color:#FE2C55; }
+    .logo-sub { color:rgba(255,255,255,.3); font-size:13px; margin-bottom:64px; }
+    .perf-btn {
+      width:100%; max-width:320px; padding:22px; border-radius:18px; border:none;
+      background:#FE2C55; color:#fff; font-size:18px; font-weight:800;
+      cursor:pointer; letter-spacing:.3px;
+    }
+    .perf-btn:active { opacity:.85; }
+
+    /* ── MAGO: SCHERMATA CODICE ── */
+    #view-code { background:#000; padding:40px 28px; gap:0; }
+    .code-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:20px; }
+    .code-display { display:flex; gap:10px; margin-bottom:14px; }
+    .code-letter {
+      width:72px; height:84px; background:#111; border-radius:14px;
+      border:2px solid rgba(255,255,255,.12); display:flex; align-items:center;
+      justify-content:center; font-size:38px; font-weight:900; color:#fff;
+    }
+    #copy-url-btn {
+      display:block; width:100%; margin-top:12px;
+      padding:14px 0; background:#FE2C55; color:#fff;
+      border:none; border-radius:14px; font-size:15px; font-weight:700;
+      cursor:pointer; letter-spacing:.3px; transition:background .25s;
+    }
+    #copy-url-btn:active { opacity:.8; }
+    .code-url-row { word-break:break-all; font-size:11px; margin-top:6px;
+      color:rgba(255,255,255,.6); }
+    .code-url {
+      font-size:12px; color:rgba(255,255,255,.3); margin-bottom:32px; text-align:center;
+      padding:8px 16px; background:rgba(255,255,255,.04); border-radius:8px;
+      max-width:320px; word-break:break-all;
+    }
+    .code-url span { color:#90E0EF; font-weight:600; }
+    .viewer-badge {
+      display:flex; align-items:center; gap:10px; padding:13px 18px;
+      background:rgba(255,255,255,.04); border-radius:12px; margin-bottom:32px;
+      font-size:14px; width:100%; max-width:320px;
+    }
+    .dot { width:9px; height:9px; border-radius:50%; background:#333; flex-shrink:0; transition:all .3s; }
+    .dot.live { background:#4CAF50; box-shadow:0 0 8px #4CAF50; }
+    .open-btn {
+      width:100%; max-width:320px; padding:20px; border-radius:16px; border:none;
+      background:#FE2C55; color:#fff; font-size:17px; font-weight:700; cursor:pointer;
+    }
+    .open-btn:active { opacity:.85; }
+
+    /* ── FEED (comune) ── */
+    .feed-view { padding:0; align-items:stretch; }
+    .feed-container { position:relative; width:100%; overflow:hidden; flex:1; min-height:0; touch-action:none; overscroll-behavior:none; background:#000; }
+    .slides-wrapper { position:absolute; top:0; left:0; right:0; will-change:transform; transition:transform .28s cubic-bezier(.4,0,.2,1); touch-action:none; background:#000; }
+    .video-slide { position:relative; width:100%; height:100vh; height:100dvh; height:var(--slide-h,100svh); overflow:hidden; background:#111; touch-action:none; }
+
+    /* ── SLIDE IMMAGINE ── */
+    /* Immagine/video di sfondo */
+    .slide-img, .slide-vid {
+      position:absolute; inset:0; width:100%; height:100%;
+      object-fit:cover; object-position:center;
+    }
+    /* Ken Burns: movimento sottile sulle foto per simulare video */
+    @keyframes kb {
+      0%   { transform:scale(1.0) translate(0%,0%); }
+      33%  { transform:scale(1.06) translate(-1.5%,-1%); }
+      66%  { transform:scale(1.04) translate(1%,-1.5%); }
+      100% { transform:scale(1.08) translate(-0.5%,1%); }
+    }
+    /* Ken Burns SOLO sulla slide attiva → evita 65 layer GPU compositati (OOM iOS) */
+    .slide-img { transform:scale(1.04); }
+    .video-slide.active .slide-img { animation:kb 14s ease-in-out infinite alternate; }
+    .slide-vid { display:none; } /* nascosto finché non è pronto */
+    .slide-vid.ready { display:block; }
+    .slide-img.hidden { opacity:0; }
+
+    /* Vignette TikTok */
+    .tk-vignette {
+      position:absolute; inset:0; pointer-events:none; z-index:1;
+      background:linear-gradient(to bottom,
+        rgba(0,0,0,.4) 0%, transparent 20%,
+        transparent 50%,
+        rgba(0,0,0,.3) 65%,
+        rgba(0,0,0,.75) 88%,
+        rgba(0,0,0,.88) 100%
+      );
+    }
+
+    /* ── TOP BAR ── */
+    .tk-topbar {
+      position:absolute; top:0; left:0; right:0; z-index:10;
+      padding: max(44px, env(safe-area-inset-top, 44px)) 12px 8px;
+      display:flex; align-items:flex-end; justify-content:center;
+      pointer-events:none;
+    }
+    .tk-tabs { display:flex; align-items:center; gap:2px; }
+    .tk-tab { font-size:15px; font-weight:500; color:rgba(255,255,255,.55); padding:0 8px 3px; }
+    .tk-tab-active { font-size:16px; font-weight:700; color:#fff; border-bottom:2px solid #fff; padding-bottom:3px; }
+    .tk-sep { color:rgba(255,255,255,.2); font-size:13px; padding:0 2px; }
+    .tk-search { position:absolute; right:12px; bottom:10px; opacity:.9; }
+    .tk-live { position:absolute; left:8px; bottom:6px; display:flex; align-items:center; }
+
+    /* ── SIDEBAR DESTRA ── */
+    .tk-sidebar {
+      position:absolute; right:6px;
+      bottom:calc(var(--nav-h) + max(env(safe-area-inset-bottom,0px), 16px) + 6px);
+      z-index:10;
+      display:flex; flex-direction:column; align-items:center; gap:16px;
+    }
+    .tk-av-wrap { position:relative; margin-bottom:8px; }
+    .tk-av { width:50px; height:50px; border-radius:50%; border:2px solid #fff; object-fit:cover; display:block; }
+    .tk-follow-btn {
+      position:absolute; bottom:-10px; left:50%; transform:translateX(-50%);
+      width:22px; height:22px; border-radius:50%;
+      background:#FE2C55; border:2px solid #000;
+      color:#fff; font-size:18px; font-weight:300; line-height:1;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .tk-action {
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      cursor:pointer; min-width:44px;
+    }
+    /* SVG e contatori non catturano eventi → click va sempre all'action wrapper */
+    .tk-action svg, .tk-action .tk-count { pointer-events:none; }
+    .tk-action.liked .tk-heart path { fill:#FE2C55 !important; stroke:#FE2C55 !important; }
+    .tk-count { font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+    .tk-disc-wrap { position:relative; width:42px; height:42px; border-radius:50%; overflow:hidden; border:3px solid rgba(255,255,255,.2); flex-shrink:0; }
+    .tk-disc { width:100%; height:100%; object-fit:cover; animation:spin 4s linear infinite; }
+    .tk-disc-hole { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:13px; height:13px; border-radius:50%; background:#111; z-index:2; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── INFO BASSO SINISTRA ── */
+    .tk-info {
+      position:absolute; left:12px;
+      bottom:calc(var(--nav-h) + max(env(safe-area-inset-bottom,0px), 16px) + 6px);
+      right:72px; z-index:10;
+    }
+    .tk-username {
+      font-size:15px; font-weight:700; color:#fff;
+      text-shadow:0 1px 2px rgba(0,0,0,.6);
+      margin-bottom:5px; display:flex; align-items:center; gap:5px;
+    }
+    .tk-verified {
+      width:15px; height:15px; border-radius:50%; background:#20A4F3;
+      font-size:9px; font-weight:700; color:#fff;
+      display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .tk-desc {
+      font-size:13px; color:rgba(255,255,255,.9); line-height:1.45;
+      margin-bottom:5px; text-shadow:0 1px 2px rgba(0,0,0,.5);
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .tk-tags { font-size:13px; font-weight:700; color:#fff; margin-bottom:9px; text-shadow:0 1px 2px rgba(0,0,0,.5); }
+    .tk-sound { display:flex; align-items:center; gap:6px; cursor:pointer; overflow:hidden; }
+    .tk-note {
+      width:19px; height:19px; border-radius:50%; background:rgba(255,255,255,.12);
+      border:1.5px solid rgba(255,255,255,.35);
+      display:flex; align-items:center; justify-content:center;
+      font-size:10px; flex-shrink:0; animation:spin 4s linear infinite;
+    }
+    .tk-sound-txt { font-size:12px; color:rgba(255,255,255,.85); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ── BOTTOM NAV ── */
+    :root { --nav-h:49px; }
+    .tk-nav {
+      position:absolute; bottom:0; left:0; right:0; z-index:10;
+      display:flex; align-items:flex-start; justify-content:space-around;
+      background:rgba(0,0,0,.92); border-top:.5px solid rgba(255,255,255,.12);
+      padding: 8px 0 max(16px, calc(env(safe-area-inset-bottom,0px) + 6px));
+    }
+    .tk-nav-item { display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; cursor:pointer; padding:2px 0; }
+    .tk-nav-item svg { display:block; }
+    .tk-nav-lbl { font-size:9px; color:rgba(255,255,255,.5); letter-spacing:.2px; }
+    .tk-nav-lbl.on { color:#fff; font-weight:700; }
+    .tk-nav-plus { flex:0 0 56px; display:flex; align-items:center; justify-content:center; }
+    .tk-plus-c {
+      width:42px; height:28px; border-radius:7px; background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      position:relative;
+    }
+    .tk-plus-c::before { content:''; position:absolute; left:-9px; top:0; width:10px; height:100%; background:#69C9D0; border-radius:5px 0 0 5px; }
+    .tk-plus-c::after  { content:''; position:absolute; right:-9px; top:0; width:10px; height:100%; background:#EE1D52; border-radius:0 5px 5px 0; }
+    .tk-plus-txt { font-size:22px; font-weight:200; color:#000; position:relative; z-index:1; line-height:1; }
+
+    /* ── TOP BAR FISSO ── */
+    .top-bar {
+      position:absolute; top:0; left:0; right:0; z-index:20;
+      padding:max(44px,env(safe-area-inset-top,44px)) 12px 8px;
+      display:flex; align-items:flex-end; justify-content:center;
+      background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent);
+      pointer-events:none;
+    }
+    /* ── BOTTOM NAV FISSO ── */
+    .bottom-nav {
+      position:absolute; bottom:0; left:0; right:0; z-index:20;
+      display:flex; align-items:flex-start; justify-content:space-around;
+      background:rgba(0,0,0,.92); border-top:.5px solid rgba(255,255,255,.12);
+      padding:8px 0 max(16px,calc(env(safe-area-inset-bottom,0px) + 6px));
+    }
+    .nav-item { display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; cursor:pointer; padding:2px 0; }
+    .nav-lbl  { font-size:9px; color:rgba(255,255,255,.5); letter-spacing:.2px; }
+    .nav-lbl.on { color:#fff; font-weight:700; }
+    .nav-plus { flex:0 0 56px; display:flex; align-items:center; justify-content:center; }
+    .nav-plus-c { width:42px; height:28px; border-radius:7px; background:#fff; display:flex; align-items:center; justify-content:center; position:relative; }
+    .nav-plus-c::before { content:''; position:absolute; left:-9px; top:0; width:10px; height:100%; background:#69C9D0; border-radius:5px 0 0 5px; }
+    .nav-plus-c::after  { content:''; position:absolute; right:-9px; top:0; width:10px; height:100%; background:#EE1D52; border-radius:0 5px 5px 0; }
+
+    /* ── PANNELLO SEGRETO ── */
+    #secret-zone { position:fixed; bottom:calc(var(--nav-h) + max(env(safe-area-inset-bottom,0px),16px) + 4px); right:0; width:88px; height:88px; z-index:999; }
+    #home-zone    { position:fixed; top:0; left:0;  width:90px; height:65px; z-index:999; }
+    #control-panel { display:none; position:fixed; inset:0; z-index:1000; align-items:center; justify-content:center; }
+    #control-panel.open { display:flex; }
+    .panel-bg { position:absolute; inset:0; background:rgba(0,0,0,.9); backdrop-filter:blur(28px); }
+    .panel-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.2); text-align:center; margin-bottom:10px; margin-top:6px; }
+    .panel-code { display:flex; justify-content:center; gap:6px; margin-bottom:6px; }
+    .panel-code-letter { width:40px; height:44px; background:#1a1a1a; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:900; color:rgba(255,255,255,.6); }
+    .panel-code-hint { font-size:9px; color:rgba(255,255,255,.2); text-align:center; margin-bottom:10px; }
+    .panel-status { display:flex; align-items:center; gap:9px; padding:9px 12px; background:rgba(255,255,255,.04); border-radius:10px; margin-bottom:10px; font-size:13px; }
+    .num-label { font-size:10px; color:rgba(255,255,255,.3); text-align:center; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:8px; }
+    .num-btn { border-radius:8px; border:none; background:rgba(255,255,255,.07); color:#fff; font-size:15px; font-weight:600; cursor:pointer; transition:all .12s; width:100%; }
+    .num-btn:active { transform:scale(.92); }
+    .num-btn.sel { background:#FE2C55; box-shadow:0 0 16px rgba(254,44,85,.5); }
+    .activate-btn { width:100%; padding:15px; border-radius:14px; border:none; background:linear-gradient(135deg,#25D366,#128C7E); color:#fff; font-size:17px; font-weight:800; letter-spacing:.5px; cursor:pointer; margin-bottom:10px; transition:transform .1s; }
+    .activate-btn:active { transform:scale(.97); }
+    .activate-btn:disabled { background:#1e1e1e; color:#3a3a3a; cursor:default; }
+    .close-btn { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.07); background:transparent; color:rgba(255,255,255,.35); font-size:14px; cursor:pointer; margin-bottom:6px; }
+    .exit-btn  { width:100%; padding:11px; border-radius:10px; border:1px solid rgba(254,44,85,.25); background:rgba(254,44,85,.08); color:rgba(254,44,85,.7); font-size:13px; cursor:pointer; }
+
+/* Pannello full-screen — tutti i 50 numeri visibili, zero scroll */
+    .panel-header {
+      display:flex; align-items:center; padding:4px 0 12px;
+    }
+    #mago-back {
+      background:none; border:none; color:rgba(255,255,255,.6);
+      font-size:16px; cursor:pointer; padding:6px 10px 6px 0;
+      display:flex; align-items:center; gap:6px;
+      letter-spacing:.3px;
+    }
+    #mago-back:active { color:#fff; }
+
+    .panel-card {
+      position:fixed; inset:0; z-index:1;
+      background:#0a0a0a;
+      display:flex; flex-direction:column;
+      padding:env(safe-area-inset-top, 24px) 20px 24px;
+      overflow:hidden;
+    }
+    .num-grid {
+      flex:1;
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      grid-auto-rows:1fr;
+      gap:6px;
+      margin-bottom:14px;
+      min-height:0;
+    }
+
+    /* ── PANNELLO SEGRETO SPETTATORE ── */
+    #spett-panel {
+      display:none; position:fixed; inset:0; z-index:1000;
+      background:rgba(0,0,0,.92); backdrop-filter:blur(20px);
+      flex-direction:column; align-items:center; justify-content:center; padding:24px;
+    }
+
+    /* ── SPIA COUNTDOWN MAGO ── */
+    #mago-dot {
+      display:none; position:fixed; bottom:14px; right:14px;
+      width:5px; height:5px; border-radius:50%;
+      z-index:997; pointer-events:none;
+      background:rgba(255,255,255,.8);
+      box-shadow:0 0 0 2px rgba(0,0,0,.95);
+    }
+    @keyframes dotblink {
+      0%,100% { opacity:1; }
+      50%      { opacity:0; }
+    }
+    #mago-dot.blinking { animation:dotblink .9s ease-in-out infinite; }
+
+    /* ── SPLASH FULLSCREEN ── */
+    #splash {
+      position:fixed; inset:0; z-index:999999;
+      background:#000; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:24px;
+      cursor:pointer; user-select:none; -webkit-user-select:none;
+      touch-action:manipulation;
+    }
+    .splash-logo { font-size:42px; font-weight:900; letter-spacing:-1px; color:#fff; }
+    .splash-logo span { color:#FE2C55; }
+    .splash-tap {
+      color:rgba(255,255,255,.55); font-size:15px; font-weight:500;
+      letter-spacing:.5px; text-align:center; line-height:1.6;
+    }
+    .splash-pulse {
+      width:52px; height:52px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.25);
+      display:flex; align-items:center; justify-content:center;
+      font-size:22px; animation:splashpulse 2s ease-in-out infinite;
+    }
+    @keyframes splashpulse {
+      0%,100% { transform:scale(1);   opacity:.6; }
+      50%      { transform:scale(1.1); opacity:1; }
+    }
+    #hold-indicator {
+      display:none; position:fixed; top:50%; left:50%;
+      transform:translate(-50%,-50%); z-index:9998;
+      flex-direction:column; align-items:center; gap:10px;
+      background:rgba(0,0,0,.75); padding:24px 28px;
+      border-radius:20px; backdrop-filter:blur(16px);
+      pointer-events:none;
+    }
+    #hold-indicator.show { display:flex; }
+    #hold-indicator span { color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.5px; }
+    @keyframes hold-fill {
+      from { stroke-dashoffset: 220; }
+      to   { stroke-dashoffset: 0; }
+    }
+    #hold-ring { animation:none; }
+    #hold-ring.running { animation:hold-fill 3s linear forwards; }
+
+    /* ── INTERAZIONI FAKE ── */
+    .heart-burst {
+      position:fixed; pointer-events:none; z-index:9999;
+      width:100px; height:100px;
+      transform:scale(0); opacity:0;
+    }
+    @keyframes heartpop {
+      0%   { transform:scale(0) rotate(-15deg); opacity:0; }
+      12%  { transform:scale(1.35) rotate(5deg); opacity:1; }
+      22%  { transform:scale(1.1) rotate(-3deg); opacity:1; }
+      35%  { transform:scale(1.0) rotate(0deg); opacity:1; }
+      70%  { transform:scale(1.0) rotate(0deg); opacity:1; }
+      100% { transform:scale(.85) rotate(0deg); opacity:0; }
+    }
+    .heart-burst.pop { animation:heartpop .75s cubic-bezier(.17,.89,.32,1.28) forwards; }
+
+    /* Overlay generico (commenti, share, profilo, musica) */
+    .fake-overlay { display:none; position:fixed; inset:0; z-index:2000; }
+    .fake-overlay.open { display:flex; flex-direction:column; justify-content:flex-end; }
+    .fake-overlay-bg { position:absolute; inset:0; background:rgba(0,0,0,.55); }
+    .fake-sheet {
+      position:relative; z-index:1; background:#1c1c1e; border-radius:20px 20px 0 0;
+      padding:16px 16px 32px; max-height:70vh; overflow-y:auto;
+    }
+    .fk-handle { width:36px; height:4px; background:rgba(255,255,255,.2); border-radius:2px; margin:0 auto 14px; }
+    .fk-title { text-align:center; font-size:15px; font-weight:600; color:#fff; margin-bottom:16px; }
+    .fk-close { width:100%; padding:13px; border:none; background:rgba(255,255,255,.08); color:rgba(255,255,255,.7); border-radius:12px; font-size:15px; cursor:pointer; margin-top:12px; }
+
+    /* Commenti */
+    .fc-item { display:flex; gap:10px; margin-bottom:14px; align-items:flex-start; }
+    .fc-av { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+    .fc-name { font-size:13px; font-weight:600; color:rgba(255,255,255,.9); margin-bottom:3px; }
+    .fc-text { font-size:14px; color:rgba(255,255,255,.75); line-height:1.4; }
+
+    /* Share sheet */
+    .share-row { display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-bottom:20px; }
+    .share-item { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .share-icon { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; }
+    .share-lbl { font-size:11px; color:rgba(255,255,255,.6); }
+
+    /* Profilo mini */
+    .prof-header { display:flex; flex-direction:column; align-items:center; gap:10px; padding:16px 0 20px; }
+    .prof-av { width:72px; height:72px; border-radius:50%; object-fit:cover; border:2px solid rgba(255,255,255,.2); }
+    .prof-name { font-size:17px; font-weight:700; color:#fff; }
+    .prof-stats { display:flex; gap:28px; }
+    .prof-stat { text-align:center; }
+    .prof-stat-n { font-size:17px; font-weight:700; color:#fff; display:block; }
+    .prof-stat-l { font-size:12px; color:rgba(255,255,255,.5); }
+    .prof-follow { width:100%; padding:13px; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; margin-top:4px; }
+    .prof-follow.out { background:#FE2C55; color:#fff; }
+    .prof-follow.in  { background:rgba(255,255,255,.1); color:rgba(255,255,255,.7); }
+
+    /* Musica */
+    .music-disc { width:80px; height:80px; border-radius:50%; object-fit:cover; margin:8px auto 12px; animation:spin 4s linear infinite; display:block; border:3px solid rgba(255,255,255,.2); }
+    .music-title { text-align:center; font-size:16px; font-weight:700; color:#fff; margin-bottom:4px; }
+    .music-sub { text-align:center; font-size:13px; color:rgba(255,255,255,.5); margin-bottom:20px; }
+    .music-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .music-btn { padding:10px 20px; border-radius:8px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.07); color:#fff; font-size:14px; cursor:pointer; }
+
+    /* Regole desktop già definite sopra */
+  </style>
+  <script>
+    // Blocca --slide-h al valore di caricamento — NON aggiornare su resize.
+    // Su iOS Safari, quando la barra URL appare/scompare, window.innerHeight cambia.
+    // Se aggiorniamo --slide-h dinamicamente, le slide cambiano altezza ma il
+    // swiper (che usa lo stesso valore per i translate) resta indietro → slittamento.
+    // Bloccando il valore, tutto rimane consistente qualunque cosa faccia la barra URL.
+    var _isDesktop = window.matchMedia('(min-width:600px)').matches;
+    window._SLIDE_H = _isDesktop ? Math.round(Math.min(852, window.innerHeight * 0.96)) : window.innerHeight;
+    document.documentElement.style.setProperty('--slide-h', window._SLIDE_H + 'px');
+  </script>
+</head>
+<body>
+<div id="phone-root">
+
+
+<!-- MAGO: HOME -->
+<div id="view-home" class="view">
+  <div class="logo">Reel<span>Sync</span></div>
+  <div class="logo-sub">Magic Performance Tool</div>
+  <button class="perf-btn" id="btn-performance">🎩 &nbsp;NUOVA PERFORMANCE</button>
+</div>
+
+<!-- MAGO: MOSTRA CODICE -->
+<div id="view-code" class="view">
+  <div class="code-eyebrow">Codice Sessione</div>
+  <div class="code-display" id="code-display">
+    <div class="code-letter">-</div>
+    <div class="code-letter">-</div>
+    <div class="code-letter">-</div>
+    <div class="code-letter">-</div>
+  </div>
+  <div class="code-url" id="code-url-display">
+    Invia questo link allo spettatore:
+    <div class="code-url-row">
+      <span id="code-url-text">—</span>
+    </div>
+    <button class="copy-link-btn" id="copy-url-btn" onclick="
+      var url=document.getElementById('code-url-text').textContent;
+      var btn=document.getElementById('copy-url-btn');
+      function showOk(){btn.textContent='✓ Copiato!';btn.style.background='#1a8a3c';setTimeout(function(){btn.textContent='📋 Copia link';btn.style.background='';},2200);}
+      if(navigator.clipboard){navigator.clipboard.writeText(url).then(showOk).catch(function(){});}
+      else{var t=document.createElement('textarea');t.value=url;t.style.cssText='position:fixed;opacity:0;top:0;left:0;width:1px;height:1px';document.body.appendChild(t);t.focus();t.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(t);showOk();}
+    ">📋 Copia link</button>
+  </div>
+  <div class="viewer-badge">
+    <div class="dot" id="code-dot"></div>
+    <span id="code-status">In attesa dello spettatore...</span>
+      <div id="code-debug" style="font-size:11px;color:#888;margin-top:6px;min-height:14px;font-family:monospace"></div>
+  </div>
+  <button class="open-btn" id="open-btn">APRI IL MIO FEED →</button>
+</div>
+
+<!-- MAGO: FEED -->
+<div id="view-mago-feed" class="view feed-view">
+  <div class="feed-container" id="mago-container">
+    <div class="top-bar">
+      <div class="tk-live"><svg viewBox="0 0 52 36" width="44" height="30" xmlns="http://www.w3.org/2000/svg">
+          <!-- Schermo TV: rettangolo outline bianco -->
+          <rect x="1.5" y="1.5" width="49" height="26" rx="4" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="1.8"/>
+          <!-- Testo LIVE centrato nello schermo -->
+          <text x="26" y="19" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10" font-weight="800" font-family="-apple-system,BlinkMacSystemFont,sans-serif" letter-spacing="1">LIVE</text>
+          <!-- Piedistallo TV -->
+          <line x1="26" y1="27.5" x2="26" y2="33" stroke="rgba(255,255,255,0.95)" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="18" y1="33" x2="34" y2="33" stroke="rgba(255,255,255,0.95)" stroke-width="1.8" stroke-linecap="round"/>
+        </svg></div>
+      <div class="tk-tabs">
+        <span class="tk-tab">Seguiti</span>
+        <span class="tk-sep""> | </span>
+        <span class="tk-tab tk-tab-active">Per te</span>
+        <span class="tk-sep"> | </span>
+        <span class="tk-tab">Negozio</span>
+      </div>
+      <div class="tk-search">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      </div>
+    </div>
+    <div class="slides-wrapper" id="mago-slides"></div>
+    <!-- Sidebar FISSA (fuori dalle slide, non si muove) -->
+    <div class="tk-sidebar" id="mago-sidebar">
+      <div class="tk-av-wrap" id="mago-av-wrap">
+        <img class="tk-av" id="mago-av" src="" loading="lazy">
+        <div class="tk-follow-btn">+</div>
+      </div>
+      <div class="tk-action" data-type="like" id="mago-like">
+        <svg class="tk-heart" viewBox="0 0 24 24" width="34" height="34"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span class="tk-count" id="mago-like-n">0</span>
+      </div>
+      <div class="tk-action" data-type="comment" id="mago-comment">
+        <svg viewBox="0 0 24 24" width="33" height="33" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="tk-count" id="mago-comment-n">0</span>
+      </div>
+      <div class="tk-action" data-type="bookmark" id="mago-bookmark">
+        <svg viewBox="0 0 24 24" width="31" height="31" fill="white"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+        <span class="tk-count" id="mago-bookmark-n">0</span>
+      </div>
+      <div class="tk-action" data-type="share" id="mago-share">
+        <svg viewBox="0 0 24 24" width="31" height="31" fill="white"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        <span class="tk-count" id="mago-share-n">0</span>
+      </div>
+      <div class="tk-disc-wrap"><img class="tk-disc" id="mago-disc" src="" loading="lazy"><div class="tk-disc-hole"></div></div>
+    </div>
+    <!-- Info FISSA (fuori dalle slide, non si muove) -->
+    <div class="tk-info" id="mago-info">
+      <div class="tk-username" id="mago-user"></div>
+      <div class="tk-desc" id="mago-desc"></div>
+      <div class="tk-tags" id="mago-tags"></div>
+      <div class="tk-sound" id="mago-sound-wrap">
+        <div class="tk-note">♪</div>
+        <span class="tk-sound-txt" id="mago-sound"></span>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span class="nav-lbl on">Home</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <span class="nav-lbl">Scopri</span>
+      </div>
+      <div class="nav-plus">
+        <div class="nav-plus-c"><span style="font-size:22px;font-weight:300;color:#000;position:relative;z-index:1">+</span></div>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <span class="nav-lbl">Inbox</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <span class="nav-lbl">Profilo</span>
+      </div>
+    </div>
+  </div>
+  <div id="secret-zone"></div>
+<div id="home-zone"></div>
+  <div id="control-panel">
+    <div class="panel-bg" id="panel-bg"></div>
+    <div class="panel-card">
+      <div class="panel-header">
+        <button id="mago-back" onclick="document.getElementById('control-panel').classList.remove('open')">←  Torna ai reel</button>
+      </div>
+      <div class="panel-eyebrow">⚡ Performance Control</div>
+      <div class="panel-code" id="panel-code-display"></div>
+      <div class="panel-code-hint">codice sessione attiva</div>
+      <div class="panel-status"><div class="dot" id="panel-dot"></div><span id="panel-status">In attesa dello spettatore...</span></div>
+      <div class="num-label">Scegli il numero</div>
+      <div class="num-grid" id="num-grid"></div>
+      <button class="activate-btn" id="activate-btn" disabled>Set number</button>
+      <button class="close-btn" id="close-btn">Chiudi</button>
+      <button class="exit-btn" id="exit-btn">↩ Esci dalla sessione</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPIA COUNTDOWN MAGO (solo sul telefono del mago) -->
+<div id="mago-dot"></div>
+
+<!-- SPETTATORE: FEED DIRETTO (nessun landing page) -->
+<div id="view-spett-feed" class="view feed-view">
+  <div class="feed-container" id="spett-container">
+    <div class="top-bar">
+      <div class="tk-live"><svg viewBox="0 0 52 36" width="44" height="30" xmlns="http://www.w3.org/2000/svg">
+          <!-- Schermo TV: rettangolo outline bianco -->
+          <rect x="1.5" y="1.5" width="49" height="26" rx="4" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="1.8"/>
+          <!-- Testo LIVE centrato nello schermo -->
+          <text x="26" y="19" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10" font-weight="800" font-family="-apple-system,BlinkMacSystemFont,sans-serif" letter-spacing="1">LIVE</text>
+          <!-- Piedistallo TV -->
+          <line x1="26" y1="27.5" x2="26" y2="33" stroke="rgba(255,255,255,0.95)" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="18" y1="33" x2="34" y2="33" stroke="rgba(255,255,255,0.95)" stroke-width="1.8" stroke-linecap="round"/>
+        </svg></div>
+      <div class="tk-tabs">
+        <span class="tk-tab">Seguiti</span>
+        <span class="tk-sep"> | </span>
+        <span class="tk-tab tk-tab-active">Per te</span>
+        <span class="tk-sep"> | </span>
+        <span class="tk-tab">Negozio</span>
+      </div>
+      <div class="tk-search">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      </div>
+    </div>
+    <div class="slides-wrapper" id="spett-slides"></div>
+    <!-- Sidebar FISSA (fuori dalle slide, non si muove) -->
+    <div class="tk-sidebar" id="spett-sidebar">
+      <div class="tk-av-wrap" id="spett-av-wrap">
+        <img class="tk-av" id="spett-av" src="" loading="lazy">
+        <div class="tk-follow-btn">+</div>
+      </div>
+      <div class="tk-action" data-type="like" id="spett-like">
+        <svg class="tk-heart" viewBox="0 0 24 24" width="34" height="34"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l77.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span class="tk-count" id="spett-like-n">0</span>
+      </div>
+      <div class="tk-action" data-type="comment" id="spett-comment">
+        <svg viewBox="0 0 24 24" width="33" height="33" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="tk-count" id="spett-comment-n">0</span>
+      </div>
+      <div class="tk-action" data-type="bookmark" id="spett-bookmark">
+        <svg viewBox="0 0 24 24" width="31" height="31" fill="white"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+        <span class="tk-count" id="spett-bookmark-n">0</span>
+      </div>
+      <div class="tk-action" data-type="share" id="spett-share">
+        <svg viewBox="0 0 24 24" width="31" height="31" fill="white"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        <span class="tk-count" id="spett-share-n">0</span>
+      </div>
+      <div class="tk-disc-wrap"><img class="tk-disc" id="spett-disc" src="" loading="lazy"><div class="tk-disc-hole"></div></div>
+    </div>
+    <!-- Info FISSA (fuori dalle slide, non si muove) -->
+    <div class="tk-info" id="spett-info">
+      <div class="tk-username" id="spett-user"></div>
+      <div class="tk-desc" id="spett-desc"></div>
+      <div class="tk-tags" id="spett-tags"></div>
+      <div class="tk-sound" id="spett-sound-wrap">
+        <div class="tk-note">♪</div>
+        <span class="tk-sound-txt" id="spett-sound"></span>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span class="nav-lbl on">Home</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <span class="nav-lbl">Scopri</span>
+      </div>
+      <div class="nav-plus">
+        <div class="nav-plus-c"><span style="font-size:22px;font-weight:300;color:#000;position:relative;z-index:1">+</span></div>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <span class="nav-lbl">Inbox</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(255,255,255,.5)"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <span class="nav-lbl">Profilo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>const MAGO_POOL = [
+  {c1:'#FF006E',c2:'#8338EC',user:'ale_fitness_it',desc:'Il mio workout preferito 💪 voi come vi allenate?',tags:'#fitness #gym #allenamento #fyp',sound:'Eye of the Tiger - Survivor',likes:'234.5K',comments:'4.2K',shares:'18.9K',initials:'AF'},
+  {c1:'#E63946',c2:'#C77DFF',user:'runner_milan',desc:'42km completati! Prima maratona di Milano 🏃 non ci credevo',tags:'#maratona #running #milan #sport',sound:'Stronger - Kanye West',likes:'567.3K',comments:'12.4K',shares:'67.2K',initials:'RM'},
+  {c1:'#FF4D6D',c2:'#9D4EDD',user:'calisthenics_romano',desc:'Da zero alla muscle up in 6 mesi 💪 il programma completo',tags:'#calisthenics #muscleup #training',sound:'HUMBLE. - Kendrick Lamar',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'CR'},
+  {c1:'#D62828',c2:'#F77F00',user:'boxe_campagna',desc:'Lo sparring più intenso della mia vita 🥊 guardate la finale',tags:'#boxe #sparring #sport #martial',sound:'Rocky Theme - Orchestra',likes:'234.5K',comments:'8.9K',shares:'34.5K',initials:'BC'},
+  {c1:'#FF7B00',c2:'#FFBA08',user:'ciclismo_toscano',desc:'200km in Toscana in bici 🚵 le salite fanno piangere',tags:'#ciclismo #toscana #bici #gravel',sound:'Highway to Hell - AC/DC',likes:'156.3K',comments:'6.7K',shares:'28.9K',initials:'CT'},
+  {c1:'#C9184A',c2:'#FF9F1C',user:'sci_cortina',desc:'Prima sciata della stagione a Cortina ⛷️ neve perfetta',tags:'#sci #cortina #neve #inverno',sound:'Thunderstruck - AC/DC',likes:'345.6K',comments:'12.3K',shares:'67.8K',initials:'SC'},
+  {c1:'#370617',c2:'#E85D04',user:'body_trasform',desc:'6 mesi di trasformazione 📸 avevo paura di mostrarmi',tags:'#body #trasformazione #fitness #real',sound:'Eye of the Tiger - Survivor',likes:'2.1M',comments:'89.1K',shares:'456K',initials:'BT'},
+  {c1:'#B5179E',c2:'#F72585',user:'trail_runner_it',desc:'Trail running nelle Dolomiti 🏔️ 3000 metri di dislivello',tags:'#trail #running #dolomiti #montagna',sound:'Lose Yourself - Eminem',likes:'234.5K',comments:'7.8K',shares:'45.6K',initials:'TR'},
+  {c1:'#7209B7',c2:'#FF006E',user:'pilates_roma',desc:'Pilates ogni giorno per 30 giorni 🎯 quello che è cambiato',tags:'#pilates #30giorni #sfida #benessere',sound:'Waterfall - Orchestral',likes:'456.7K',comments:'23.4K',shares:'89.1K',initials:'PR'},
+  {c1:'#FF4800',c2:'#CF5C36',user:'nuoto_campioni',desc:'Allenamento in piscina alle 5 di mattina 🏊 chi capisce',tags:'#nuoto #piscina #sport #campioni',sound:'Under the Sea - Remix',likes:'89.2K',comments:'2.1K',shares:'7.8K',initials:'NC'},
+  {c1:'#9B2226',c2:'#F48C06',user:'tennis_pro_it',desc:'Colpo vincente impossibile 🎾 non avevo nemmeno mirato',tags:'#tennis #ace #sport #punto',sound:'We Are the Champions - Queen',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'TP'},
+  {c1:'#E9C46A',c2:'#F4A261',user:'pallavolo_beach',desc:'Finale beach volley vinta al tie break 🏐🔥 che partita',tags:'#pallavolo #beach #sport #estate',sound:'Jump! - Van Halen',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'PB'},
+  {c1:'#FF9F1C',c2:'#E71D36',user:'cucinaconmary',desc:'Carbonara della nonna 🍝 la ricetta che non trovate su Google',tags:'#carbonara #pasta #cucina #italy',sound:'Bella Ciao - Remix',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'CM'},
+  {c1:'#AE2012',c2:'#BB3E03',user:'pizzaiolo_napoli',desc:'Impasto napoletano 72 ore 🍕 la lievitazione perfetta',tags:'#pizza #napoli #impasto #artigianale',sound:'Funiculì Funiculà - Remix',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'PN'},
+  {c1:'#590D22',c2:'#C9184A',user:'bistecca_perfetta',desc:'La bistecca fiorentina che nessuno vi insegna 🥩🔥',tags:'#bistecca #fiorentina #griglia #carne',sound:'Satisfaction - Rolling Stones',likes:'345.6K',comments:'12.3K',shares:'67.8K',initials:'BP'},
+  {c1:'#CA6702',c2:'#EE9B00',user:'pasticceria_milo',desc:'Tiramisù della nonna in 15 minuti ☕😍 la ricetta vera',tags:'#tiramisu #dolce #dessert #ricetta',sound:'Tu Vuo Fa L\'Americano',likes:'567.8K',comments:'23.4K',shares:'89.1K',initials:'PM'},
+  {c1:'#F4845F',c2:'#F25C54',user:'sushi_milan',desc:'Ho aperto il sushi bar a Milano 🍣 a 22 anni',tags:'#sushi #milan #ristorante #giovani',sound:'Sadness and Sorrow - Naruto',likes:'1.4M',comments:'67.8K',shares:'345K',initials:'SM'},
+  {c1:'#E9D8A6',c2:'#CA6702',user:'gelateria_sicilia',desc:'Gelato pistacchio di Bronte 🍦🟩 il migliore del mondo',tags:'#ggelato #pistacchio #sicilia #bronte',sound:'O Sole Mio - Classic',likes:'789.1K',comments:'28.9K',shares:'156K',initials:'GS'},
+  {c1:'#FF006E',c2:'#FFBE0B',user:'risotto_chef',desc:'Risotto allo zafferano come al ristorante ⭐ il trucco segreto',tags:'#risotto #zafferano #chef #cucina',sound:'Nessun Dorma - Pavarotti',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'RC'},
+  {c1:'#E63946',c2:'#F4A261',user:'trattoria_storica',desc:'La trattoria del 1887 a Bologna ancora aperta 🍝',tags:'#trattoria #bologna #storia #cibo',sound:'Romagna Mia - Folk',likes:'234.5K',comments:'9.8K',shares:'45.6K',initials:'TS'},
+  {c1:'#FF4800',c2:'#E71D36',user:'colazione_ita',desc:'La colazione italiana vs americana 🥐 nessun paragone',tags:'#colazione #cornetto #caffè #italy',sound:'Espresso - Sabrina Carpenter',likes:'2.3M',comments:'89.1K',shares:'567K',initials:'CI'},
+  {c1:'#A01A7D',c2:'#DA4167',user:'cantina_val',desc:'Degustazione di Amarone 2015 🍷 vale ogni centesimo',tags:'#amarone #vino #degustazione #wine',sound:'La Traviata - Verdi',likes:'123.4K',comments:'5.6K',shares:'23.4K',initials:'CV'},
+  {c1:'#B5179E',c2:'#D62828',user:'diving_sicilia',desc:'Sott\'acqua nelle Eolie 🌊😱 non sembra neanche Italia',tags:'#eolie #diving #sicilia #mare',sound:'Ocean - Kaien Cruz',likes:'892.3K',comments:'34.5K',shares:'234.1K',initials:'DS'},
+  {c1:'#9D0208',c2:'#E85D04',user:'vulcano_etna',desc:'Sulla cima dell\'Etna di notte 🌋🔴 esperienza unica',tags:'#etna #vulcano #sicilia #avventura',sound:'Ring of Fire - June Cash',likes:'567.8K',comments:'23.4K',shares:'89.1K',initials:'VE'},
+  {c1:'#F72585',c2:'#7209B7',user:'cinqueterre_hike',desc:'Cinque Terre a piedi 🥾 il percorso che tutti ignorano',tags:'#cinqueterre #trekking #liguria #hike',sound:'Bella Italia - Folk',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'CH'},
+  {c1:'#D00000',c2:'#FFBA08',user:'venezia_alba',desc:'Venezia alle 5 di mattina senza turisti 🌅 così sembra vera',tags:'#venezia #alba #turismo #storia',sound:'Barcarole - Offenbach',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'VA'},
+  {c1:'#FF5400',c2:'#FF9F1C',user:'val_dorcia_road',desc:'Val d\'Orcia in autunno 🍂 ogni curva è un dipinto',tags:'#valdorcia #toscana #autunno #road',sound:'Volare - Dean Martin',likes:'789.1K',comments:'28.9K',shares:'156K',initials:'VD'},
+  {c1:'#E63946',c2:'#FF6B6B',user:'napoli_autentica',desc:'La Napoli che non mostrano ai turisti 😍 entrate nei vicoli',tags:'#napoli #vicoli #autentica #storia',sound:'O Sole Mio - Classic',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'NA'},
+  {c1:'#FF006E',c2:'#FF4D6D',user:'sardegna_blu',desc:'La Maddalena da barca ⛵ l\'acqua più bella che esista',tags:'#sardegna #maddalena #barca #estate',sound:'A Fuego - Pitbull',likes:'1.8M',comments:'67.8K',shares:'456K',initials:'SB'},
+  {c1:'#C9184A',c2:'#F77F00',user:'roma_nascosta',desc:'5 posti di Roma che nessuno conosce 🏛️ il n.3 vi farà impazzire',tags:'#roma #nascosta #storia #travel',sound:'Roma Non Fare la Stupida Stasera',likes:'2.8M',comments:'112.3K',shares:'678K',initials:'RN'},
+  {c1:'#FF4800',c2:'#CF5C36',user:'grotte_puglia_exp',desc:'Grotte di Castellana mai viste così 🕳️ profondo 70 metri',tags:'#grotte #puglia #castellana #natura',sound:'Mysterious Underground - Ambient',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'GP'},
+  {c1:'#9E0059',c2:'#FF006E',user:'fashion_milan_fw',desc:'Milano Fashion Week 2024 🎀 i 5 look che hanno fatto storia',tags:'#mfw #milan #fashion #moda',sound:'Runway - Fashion Beat',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'MF'},
+  {c1:'#7B2D8B',c2:'#C9184A',user:'sartoria_napoli',desc:'La sartoria napoletana 100 anni di storia 🧵',tags:'#sartoria #napoli #lusso #artigianato',sound:'O Sole Mio - Orchestral',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'SN'},
+  {c1:'#FFF006E',c2:'#E63946',user:'sneaker_drop',desc:'Apertura Nike SNKRS alle 3 di notte 👟 vale la pena?',tags:'#sneaker #nike #drop #sneakerhead',sound:'Jumpman - Drake',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'SD'},
+  {c1:'#C9184A',c2:'#FF6B6B',user:'bellezza_ita',desc:'Il trucco naturale italiano che non esiste all\'estero ✨',tags:'#bellezza #makeup #naturale #italia',sound:'Bella - Malika Ayane',likes:'567.8K',comments:'23.4K',shares:'89.1K',initials:'BI'},
+  {c1:'#480CA8',c2:'#FF006E',user:'capsule_wardrobe',desc:'10 capi per 30 outfit diversi 👗 la capsula perfetta',tags:'#capsule #wardrobe #stile #moda',sound:'Feeling Good - Nina Simone',likes:'1.1M',comments:'45.6K',shares:'234K',initials:'CW'},
+  {c1:'#9D0208',c2:'#F48C06',user:'musica_und_feat',desc:'Questo artista uscirà tra 6 mesi ed esploderà 💥',tags:'#musica #indie #emergente #fyp',sound:'New Track Preview - Unreleased',likes:'123.4K',comments:'34.5K',shares:'45.6K',initials:'MU'},
+  {c1:'#E63946',c2:'#B5179E',user:'operaflash_rom',desc:'Flashmob d\'opera al Colosseo 🎭 i turisti non capivano niente',tags:'#opera #flashmob #roma #classica',sound:'Nessun Dorma - Pavarotti',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'OF'},
+  {c1:'#C9184A',c2:'#7209B7',user:'piano_cover_viral',desc:'Ho suonato Billie Jean solo con pianoforte 🎹',tags:'#piano #cover #billiejean #viral',sound:'Billie Jean - Piano Cover',likes:'3.2M',comments:'123.4K',shares:'678K',initials:'PC'},
+  {c1:'#FF4D6D',c2:'#B5179E',user:'cantautore_ita',desc:'La mia prima canzone dopo 10 anni di pausa 🎵',tags:'#cantautore #canzone #primo #indie',sound:'Original Song - Unreleased',likes:'789.1K',comments:'45.6K',shares:'156K',initials:'CA'},
+  {c1:'#AE2012',c2:'#CA6702',user:'jazz_venezia',desc:'Jazz improvvisato a Campo S. Margherita 🎷🌙',tags:'#jazz #venezia #improvvisazione #live',sound:'Summertime - Miles Davis',likes:'234.5K',comments:'9.8K',shares:'45.6K',initials:'JV'},
+  {c1:'#9E0059',c2:'#FF4800',user:'beatmaker_napo',desc:'Beat fatto in 20 minuti sul treno 🎧 produzione live',tags:'#beatmaker #produzione #trap #napoli',sound:'Beat Production - Live',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'BN'},
+  {c1:'#D62828',c2:'#F4A261',user:'biolum_sardegna',desc:'Bioluminescenza in Sardegna 💙✨ non avevo mai visto niente',tags:'#bioluminescenza #sardegna #mare #notte',sound:'Weightless - Marconi Union',likes:'3.4M',comments:'134.5K',shares:'789K',initials:'BS'},
+  {c1:'#FF006E',c2:'#F77F00',user:'aurora_trentino',desc:'Aurora boreale vista dall\'Alto Adige 🌈🌙 in Italia esiste!',tags:'#aurora #trentino #altoadige #notte',sound:'Northern Lights - Ambient',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'AT'},
+  {c1:'#6A040F',c2:'#DC2F02',user:'orso_appennino',desc:'Ho incontrato un orso marsicano 🐻 telecamera salvata per caso',tags:'#orso #marsicano #appennino #wild',sound:'Bear Country - Documentary',likes:'4.5M',comments:'234.5K',shares:'1.2M',initials:'OA'},
+  {c1:'#F48C06',c2:'#FFBA08',user:'fioritura_umbria',desc:'La fioritura di Castelluccio 🌸 il posto più bello d\'Italia',tags:'#fioritura #umbria #castelluccio #bello',sound:'Primavera - Vivaldi',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'FU'},
+  {c1:'#E63946',c2:'#FF9F1C',user:'tech_pro_it',desc:'L\'impostazione iPhone che non sai di avere 📱 salvate!',tags:'#iphone #tip #tech #trucco',sound:'Techno Pop - Kraftwerk',likes:'4.2M',comments:'178.9K',shares:'1.1M',initials:'TP'},
+  {c1:'#B5179E',c2:'#F72585',user:'ai_tools_ita',desc:'5 AI che mi fanno guadagnare 3000€ al mese 🤖',tags:'#ai #tools #guadagno #business',sound:'Technologic - Daft Punk',likes:'3.4M',comments:'134.5K',shares:'789K',initials:'AI'},
+  {c1:'#9D0208',c2:'#E85D04',user:'cybersec_italia',desc:'Questo sito vi sta spiando ADESSO 👁️ come proteggersi',tags:'#cybersecurity #privacy #hacker #tech',sound:'Sneaky - Spy Music',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'CI'},
+  {c1:'#FF4800',c2:'#7B2D8B',user:'drone_pilot_it',desc:'Il mio drone da 12.000€ 🚁 ogni funzione spiegata',tags:'#drone #aerial #pilota #tech',sound:'Elevation - U2',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'DP'},
+  {c1:'#C9184A',c2:'#F48C06',user:'social_media_tip',desc:'L\'algoritmo TikTok spiegato in 60 secondi 📈 salvate',tags:'#algoritmo #tiktok #crescita #tip',sound:'Money - Pink Floyd',likes:'3.1M',comments:'123.4K',shares:'678K',initials:'SM'},
+  {c1:'#FF9F1C',c2:'#D62828',user:'comico_napoli_1',desc:'Il mio vicino di casa 😂😂 ogni singolo giorno uguale',tags:'#comedia #napoli #vicino #funny',sound:'Laughing Track - Comedy',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'CN'},
+  {c1:'#E63946',c2:'#FFBE0B',user:'studente_fuorisede',desc:'Vita da studente fuorisede 🎓 la lista della spesa fa paura',tags:'#studente #fuorisede #vita #universita',sound:'Under Pressure - Queen',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'SF'},
+  {c1:'#FF4D6D',c2:'#F77F00',user:'smartwork_fails',desc:'Smart working quando i bambini entrano nella call 🤦 AIUTO',tags:'#smartworking #lavoro #bambini #fail',sound:'Mission Impossible - Theme',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'SW'},
+  {c1:'#FFBA08',c2:'#E63946',user:'gatto_imperatore',desc:'Il mio gatto che pensa di essere il re di casa 👑🐱',tags:'#gatto #cat #funny #re',sound:'Circle of Life - Lion King',likes:'6.7M',comments:'345.6K',shares:'1.8M',initials:'GI'},
+  {c1:'#FF9F1C',c2:'#F4A261',user:'cane_avventura',desc:'Ho portato il mio cane al ristorante stellato 🐕🍽️',tags:'#cane #ristorante #michelin #funny',sound:'What a Wonderful World - Armstrong',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'CA'},
+  {c1:'#F4A261',c2:'#E76F51',user:'bimbo_filosofo',desc:'Mio figlio di 4 anni spiega la crisi esistenziale 👶🧠',tags:'#bambino #filosofia #cute #pensieri',sound:'Thinking Out Loud - Ed Sheeran',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'BF'},
+  {c1:'#FF5400',c2:'#CF5C36',user:'autobus_fail',desc:'Quello che succede ogni mattina sull\'autobus 🚌😩',tags:'#autobus #pendolare #vita #fail',sound:'Everybody Hurts - REM',likes:'2.8M',comments:'112.3K',shares:'567K',initials:'AF'},
+  {c1:'#C9184A',c2:'#FF9F1C',user:'prima_volta_gym',desc:'Il mio primo giorno in palestra 🏋️ non tornerei mai indietro',tags:'#palestra #gym #prima_volta #imbarazzo',sound:'Eye of the Tiger - Survivor',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'PG'},
+  {c1:'#9E0059',c2:'#F48C06',user:'arte_dig_studio',desc:'Ho creato questo pezzo in 48 ore no-stop 🎨 step by step',tags:'#arte #digitale #processo #illustrazione',sound:'Lofi Hip Hop - Study',likes:'567.8K',comments:'23.4K',shares:'89.1K',initials:'AD'},
+  {c1:'#6A040F',c2:'#AE2012',user:'scultura_marmo',desc:'Scolpire il marmo di Carrara come gli antichi 🗿 3 mesi',tags:'#scultura #marmo #carrara #arte',sound:'Classical Instrumentals',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'SM'},
+  {c1:'#D62828',c2:'#B5179E',user:'graffiti_writer',desc:'Murales 30 metri in 8 ore 🎨 la crew che lo ha realizzato',tags:'#graffiti #murales #streetart #crew',sound:'POWER - Kanye West',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'GW'},
+  {c1:'#F4A261',c2:'#E9C46A',user:'ceramica_faenza',desc:'La ceramica di Faenza copiata dal mondo da 500 anni 🏺',tags:'#ceramica #faenza #artigianato #storia',sound:'La Vita è Bella - Piano',likes:'345.6K',comments:'12.3K',shares:'67.8K',initials:'CF'},
+  {c1:'#FF9F1C',c2:'#AE2012',user:'liutaio_cremona',desc:'Costruire un violino a Cremona 🎻 6 mesi di lavoro',tags:'#liuteria #cremona #violino #artigianato',sound:'Bach Partita - Violin',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'LC'},
+  {c1:'#590D22',c2:'#E9C466A',user:'vetro_murano',desc:'Il maestro del vetro di Murano 🫧 60 anni di mestiere',tags:'#vetro #murano #venezia #artigianato',sound:'Barcarole - Offenbach',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'VM'},
+  {c1:'#D62828',c2:'#9E0059',user:'fotografia_ita',desc:'La foto che mi ha cambiato la vita 📸 l\'ho scattata per caso',tags:'#fotografia #scatto #arte #storia',sound:'Clair de Lune - Debussy',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'FI'},
+  {c1:'#CA6702',c2:'#E63946',user:'mosaico_rav',desc:'Il mosaico di Ravenna spiegato dal maestro 🟡🔵 1500 anni',tags:'#mosaico #ravenna #storia #arte',sound:'Byzantine - Chant',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'MR'},
+];
+
+// ================================================================
+//  POOL SPETTATORE — toni FREDDI (blu, verde, teal, ciano)
+//  55 video
+// ================================================================
+const SPETT_POOL = [
+  {c1:'#0077B6',c2:'#00B4D8',user:'beach_runner',desc:'Corsa alle 6 in spiaggia 🏃‍♀️ chi lo fa con me domani?',tags:'#running #beach #sport #estate',sound:'Run Boy Run - Woodkid',likes:'156.3K',comments:'3.8K',shares:'12.1K',initials:'BR'},
+  {c1:'#023E8A',c2:'#0096C7',user:'bootcamp_mil',desc:'Bootcamp alle 6 di mattina a Milano 💪 chi sopravvive?',tags:'#bootcamp #fitness #milan #duro',sound:'We Will Rock You - Queen',likes:'234.5K',comments:'8.9K',shares:'34.5K',initials:'BM'},
+  {c1:'#1B4332',c2:'#52B788',user:'zumba_napoli',desc:'Lezione di Zumba in piazza a Napoli 💃 si sono aggiunti i passanti',tags:'#zumba #napoli #dance #fitness',sound:'Despacito - Luis Fonsi',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'ZN'},
+  {c1:'#006466',c2:'#0B525B',user:'nuoto_apnea',desc:'Apnea -40 metri senza respirare 😮 quanto reggo?',tags:'#apnea #nuoto #freediving #sport',sound:'Under the Sea - Orchestra',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'NA'},
+  {c1:'#1A535C',c2:'#4ECDC4',user:'ginnastica_art',desc:'Routine di ginnastica artistica 🤸 5 anni per questi 60 secondi',tags:'#ginnastica #artistica #sport #grazia',sound:'Swan Lake - Tchaikovsky',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'GA'},
+  {c1:'#2D6A4F',c2:'#95D5B2',user:'padel_explosion',desc:'Il padel sta spazzando via tutto 🏓 ho capito perché',tags:'#padel #sport #trend #italia',sound:'Daddy Yankee - Gasolina',likes:'678.9K',comments:'26.3K',shares:'123.4K',initials:'PE'},
+  {c1:'#005F73',c2:'#0A9396',user:'tennis_storia',desc:'Ho trovato le racchette del nonno e ho battuto mio fratello 🎾',tags:'#tennis #vintage #famiglia #sport',sound:'Bohemian Rhapsody - Queen',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'TS'},
+  {c1:'#184E77',c2:'#1E6091',user:'maratona_firenze',desc:'Ho corso la mia prima maratona a Firenze 🏆 piansi al traguardo',tags:'#maratona #firenze #running #traguardo',sound:'Run - Snow Patrol',likes:'1.8M',comments:'78.9K',shares:'456K',initials:'MF'},
+  {c1:'#14213D',c2:'#006494',user:'arrampicata_indoor',desc:'Da principiante al 7b in 8 mesi 🧗 il metodo che funziona',tags:'#arrampicata #climbing #indoor #metodo',sound:'Can\'t Stop - RHCP',likes:'234.5K',comments:'9.8K',shares:'45.6K',initials:'AI'},
+  {c1:'#1D3557',c2:'#457B9D',user:'pane_madre',desc:'Pane con lievito madre che faccio da 3 anni 🍞 la ricetta',tags:'#pane #lievitomadre #forno #ricetta',sound:'Bread Song - Acoustic',likes:'789.1K',comments:'28.9K',shares:'156K',initials:'PM'},
+  {c1:'#006400',c2:'#2D6A4F',user:'pasta_nonna_video',desc:'La nonna di 87 anni che fa la pasta a mano 👵🍝 patrimonio',tags:'#pasta #nonna #tradizione #food',sound:'Core \'ngrato - Classic',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'PN'},
+  {c1:'#004E89',c2:'#1A659E',user:'aperitivo_torino',desc:'Aperitivo a Torino: la città che l\'ha inventato 🥂🍸',tags:'#aperitivo #torino #vermouth #cocktail',ssound:'La Dolce Vita - Remix',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'AT'},
+  {c1:'#0F4C5C',c2:'#31A7B8',user:'focaccia_gen',desc:'Focaccia genovese originale 🫓 quella vera ha l\'olio sopra',tags:'#focaccia #genova #liguria #forno',sound:'Azzurro - Adriano Celentano',likes:'1.1M',comments:'45.6K',shares:'234K',initials:'FG'},
+  {c1:'#073B4C',c2:'#118AB2',user:'cannolo_sic_aut',desc:'Il cannolo siciliano autentico a Palermo 🍮 non quello falso',tags:'#cannolo #sicilia #palermo #dolce',sound:'O Sole Mio - Modern',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'CS'},
+  {c1:'#006494',c2:'#13C4DD',user:'porchetta_ariccia',desc:'La porchetta di Ariccia 🐷 alle 8 di mattina calda',tags:'#porchetta #ariccia #roma #cibo',sound:'Volare - Gipsy Kings',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'PA'},
+  {c1:'#1E6091',c2:'#168AAD',user:'tortellini_a_mano',desc:'Tortellini uno a uno fatti a mano 🍝 1 ora per 50',tags:'#tortellini #bologna #pasta #mano',sound:'Romagna Mia - Folk',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'TM'},
+  {c1:'#03045E',c2:'#0077B6',user:'sfogliatella_napo',desc:'La sfogliatella calda a Napoli alle 7 di mattina 🥐 paradiso',tags:'#sfogliatella #napoli #colazione #bar',sound:'Funiculì Funiculà - Classic',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'SN'},
+  {c1:'#006466',c2:'#144552',user:'sicilia_moto',desc:'Sicilia in moto da est a ovest 🏍️ 1200km in 7 giorni',tags:'#sicilia #moto #travel #viaggio',sound:'Born to Be Wild - Steppenwolf',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'SM'},
+  {c1:'#023E8A',c2:'#48CAE4',user:'amalfi_kayak',desc:'Kayak lungo la costiera amalfitana 🚣 grotte inaccessibili',tags:'#amalfi #kayak #grotte #avventura',sound:'Volare - Dean Martin',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'AK'},
+  {c1:'#1B4332',c2:'#40916C',user:'firenze_rooftop',desc:'Firenze dall\'alto: il punto segreto che nessuno conosce 🔭🌆',tags:'#firenze #panorama #segreto #toscana',sound:'Bella - Malika Ayane',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'FR'},
+  {c1:'#0B3D91',c2:'#1565C0',user:'matera_sassi',desc:'Dormire nei sassi di Matera 🏚️ ti cambia la prospettiva',tags:'#matera #sassi #basilicata #storia',sound:'Cinema Paradiso - Morricone',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'MS'},
+  {c1:'#0D3B66',c2:'#226CB0',user:'alberobello_trulli',desc:'Alberobello: sembra una fiaba 🏠🌸 esiste davvero',tags:'#alberobello #trulli #puglia #magia',sound:'Once Upon a Time - Fairy',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'AT'},
+  {c1:'#004E64',c2:'#00A5CF',user:'garda_wind',desc:'Windsurf sul Garda a 40 nodi 🏄 il lago più adrenalinico',tags:'#garda #windsurf #sport #vento',sound:'Surfin\' USA - Beach Boys',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'GW'},
+  {c1:'#0077B6',c2:'#90E0EF',user:'lecce_barocco',desc:'Il barocco di Lecce in slow motion 🏛️ il più bello del mondo',tags:'#lecce #barocco #puglia #storia',sound:'O Sole Mio - Orchestral',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'LB'},
+  {c1:'#1D3557',c2:'#2196F3',user:'siena_palio',desc:'Il Palio di Siena da dentro le contrade 🐎 emozione totale',tags:'#siena #palio #storia #tradizione',sound:'Fanfare - Classical',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'SP'},
+  {c1:'#006494',c2:'#ADE8F4',user:'portofino_alba',desc:'Portofino alle 5 del mattino prima dei turisti 🌅⛵',tags:'#portofino #liguria #alba #esclusivo',sound:'La Dolce Vita - Piano',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'PA'},
+  {c1:'#184E77',c2:'#1E6091',user:'shoemaker_napo',desc:'Il calzolaio napoletano che lavora a mano da 40 anni 👞',tags:'#scarpe #napoli #artigianato #moda',sound:'O Sole Mio - Classic',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'SN'},
+  {c1:'#0B525B',c2:'#144552',user:'gioiellli_artig_it',desc:'Artigiana del gioiello a 25 anni 💍 lavora l\'oro come una volta',tags:'#gioielli #artigianato #oro #giovani',sound:'Diamonds - Rihanna',likes:'456.7K',comments:'18.9K',shares:'89.1K',initials:'GJ'},
+  {c1:'#03045E',c2:'#48CAE4',user:'soprano_lirica',desc:'Il do di petto più bello che abbiate mai sentito 🎭',tags:'#soprano #lirica #opera #musica',sound:'Casta Diva - Bellini',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'SL'},
+  {c1:'#1B4332',c2:'#B7E4C7',user:'coro_alpini',desc:'Il coro degli Alpini canta sul Monte Bianco 🏔️ brividi puri',tags:'#alpini #coro #montagna #tradizione',sound:'Signore delle Cime - Alpini',likes:'6.7M',comments:'345.6K',shares:'1.8M',initials:'CA'},
+  {c1:'#006400',c2:'#208B3A',user:'jazz_club_milan',desc:'Una notte al Blue Note di Milano 🎷 non la dimenticherò',tags:'#jazz #bluenote #milan #notte',sound:'Take Five - Dave Brubeck',likes:'234.5K',comments:'9.8K',shares:'45.6K',initials:'JM'},
+  {c1:'#073B4C',c2:'#0096C7',user:'musica_neomelodia',desc:'Il neomelodico più famoso di Napoli 🎤 live a Piazza Plebiscito',tags:'#neomelodico #napoli #live #piazza',sound:'Piazza Grande - Neomelodico',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'MN'},
+  {c1:'#006466',c2:'#52B788',user:'fisarmonica_sagra',desc:'La fisarmonica alla sagra: nonno 80 anni e balla 🪗',tags:'#fisarmonica #sagra #paese #tradizione',sound:'Fisarmonica - Folk Italiano',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'FS'},
+  {c1:'#0D3B66',c2:'#168AAD',user:'cicogne_friuli',desc:'Migrazione delle cicogne in Friuli 🦢 centinaia passano sopra',tags:'#cicogne #friuli #natura #migrazione',sound:'Circle of Life - Lion King',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'CF'},
+  {c1:'#023E8A',c2:'#0096C7',user:'lupo_appennino',desc:'Lupo solitario filmato sull\'Appennino 🐺 5 ore di attesa',tags:'#lupo #appennino #wildlife #natura',sound:'Howl at the Moon - Ambient',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'LA'},
+  {c1:'#03045E',c2:'#0077B6',user:'delfini_tirreno',desc:'Banco di delfini nel Tirreno 🐬🌊 seguivano la barca',tags:'#delfini #tirreno #mare #natura',sound:'Aqua - Barbie Girl (Slow)',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'DT'},
+  {c1:'#1B4332',c2:'#40916C',user:'upupa_campagna',desc:'L\'upupa: l\'uccello più bello d\'Italia 🐦 nel mio giardino!',tags:'#upupa #uccello #natura #giardino',sound:'Birdsong - Nature',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'UC'},
+  {c1:'#006466',c2:'#83C5BE',user:'cervo_velvet',desc:'Il cervo con le corna in velluto 🦌 solo in estate vedi questo',tags:'#cervo #velluto #natura #autunno',sound:'Autumn - Vivaldi',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'CV'},
+  {c1:'#004E89',c2:'#A9DEF9',user:'fenicotteri_sardo',desc:'I fenicotteri rosa in Sardegna 🦩 quasi 10.000 in un posto',tags:'#fenicotteri #sardegna #rosa #natura',sound:'Pink Panther - Mancini',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'FS'},
+  {c1:'#073B4C',c2:'#1E6091',user:'3dprint_artig',desc:'Stampa 3D per restaurare oggetti antichi 🏺 futuro e passato',tags:'#3dprint #restauro #tech #artigianato',sound:'Technologic - Daft Punk',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'PA'},
+  {c1:'#023E8A',c2:'#0096C7',user:'drone_racing_it',desc:'FPV drone racing ad 180km/h 🚁 dal mio punto di vista',tags:'#drone #fpv #racing #adrenalina',sound:'Speed Racer - Theme',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'DR'},
+  {c1:'#006400',c2:'#2D6A4F',user:'nonna_tiktok',desc:'Mia nonna di 83 anni che usa TikTok 👵📱 sono morto',tags:'#nonna #tiktok #anziani #funny',sound:'In the Mood - Glenn Miller',likes:'8.9M',comments:'456.7K',shares:'2.3M',initials:'NT'},
+  {c1:'#1D3557',c2:'#457B9D',user:'zia_americana',desc:'Mia zia americana in Italia per la prima volta 🇺🇸🇮🇹',tags:'#zia #americana ##italia #culture_shock',sound:'That\'s Amore - Dean Martin',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'ZA'},
+  {c1:'#184E77',c2:'#1565C0',user:'metro_milan_fail',desc:'Metro di Milano alle 8 di mattina 🚇😤 chi sopravvive vince',tags:'#metro #milan #mattina #pendolare',sound:'Eye of the Tiger - Survivor',likes:'6.7M',comments:'345.6K',shares:'1.8M',initials:'MM'},
+  {c1:'#0B3D91',c2:'#1A659E',user:'mensa_univ',desc:'La mensa universitaria spiegata ai non italiani 🍽️😂',tags:'#mensa #università #cibo #funny',sound:'Under Pressure - Queen',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'MU'},
+  {c1:'#006466',c2:'#4ECDC4',user:'traffico_napoli',desc:'Il traffico di Napoli spiegato a uno straniero 🚗📣 aiuto',tags:'#traffico #napoli #caotico #funny',sound:'Funiculì Funiculà - Remix',likes:'7.8M',comments:'456.7K',shares:'2.1M',initials:'TN'},
+  {c1:'#004E64',c2:'#00A5CF',user:'mosaico_veneziano',desc:'Il maestro del mosaico veneziano: 40 anni per una parete 🟡🔵',tags:'#mosaico #venezia #artigianato #anni',sound:'Barcarole - Piano',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'MV'},
+  {c1:'#0D3B66',c2:'#168AAD',user:'liuteria_cremon',desc:'Come si costruisce un violino a Cremona 🎻 72 ore di lavoro',tags:'#liuteria #cremona #violino #processo',sound:'Bach - Violin Partita',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'LC'},
+  {c1:'#03045E',c2:'#48CAE4',user:'vetro_murano_art',desc:'Il maestro del vetro 80enne che soffia il vetro 🫧',tags:'#vetro #murano #maestro #arte',sound:'Waterfall - Ambient',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'VM'},
+  {c1:'#1B4332',c2:'#95D5B2',user:'rilegatura_lib',desc:'Rilegatura di libri antichi 📚 l\'arte quasi dimenticata',tags:'#libro #rilegatura #artigianato #storia',sound:'Clair de Lune - Debussy',likes:'789.1K',comments:'28.9K',shares:'156K',initials:'RL'},
+  {c1:'#006494',c2:'#1E6091',user:'app_start_ita',desc:'Ho lanciato la mia startup a 19 anni 💻 cosa ho imparato',tags:'#startup #app #giovani #italia',sound:'Hall of Fame - Script',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'AS'},
+  {c1:'#023E8A',c2:'#90E0EF',user:'deepfake_art',desc:'Ho fatto il deepfake di mio nonno giovane 😭 era identico',tags:'#deepfake #ai #famiglia #memoria',sound:'Time - Hans Zimmer',likes:'6.7M',comments:'345.6K',shares:'1.8M',initials:'DA'},
+  {c1:'#0B525B',c2:'#83C5BE',user:'tessuti_como',desc:'I tessuti di Como che vestono le star di Hollywood 🎬',tags:'#tessuti #como #seta #lusso',sound:'Breakfast at Tiffany\'s - Piano',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'TC'},
+  {c1:'#006400',c2:'#52B788',user:'mercatino_vin_bo',desc:'Mercatino vintage a Bologna: quello che ho trovato 👗😱',tags:'#vintage #bologna #moda #trovata',sound:'Stayin\' Alive - Bee Gees',likes:'1.2M',comments:'45.6K',shares:'234K',initials:'MV'},
+  {c1:'#1D3557',c2:'#48CAE4',user:'primo_giorno_lav',desc:'Il mio primo giorno di lavoro in azienda 👔😰 vita reale',tags:'#lavoro #primo_giorno #ufficio #vita',sound:'Don\'t Stop Believin\' - Journey',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'PL'},
+];
+
+// ================================================================
+//  POOL CONDIVISI (30 video — visti da entrambi dopo coincidenza)
+// ================================================================
+const CONDIVISI_POOL = [
+  {c1:'#9B5DE5',c2:'#F15BB5',user:'incredibile_it',desc:'Questa cosa non è possibile 🤯🤯🤯 qualcuno lo ha visto?',tags:'#incredibile #viral #wtf #fyp',sound:'Mind Blown - Sound FX',likes:'3.2M',comments:'156.7K',shares:'890K',initials:'II'},
+  {c1:'#00BBF9',c2:'#00F5D4',user:'ocean_dreams_it',desc:'Queste acque esistono in Italia 🌊💙 non ci credevo',tags:'#mare #sardegna #summer #paradiso',sound:'Ocean Waves - Calm',likes:'2.1M',comments:'67.8K',shares:'456K',initials:'OD'},
+  {c1:'#FEE440',c2:'#F15BB5',user:'comedia_italiana',desc:'Il mio vicino di casa 😂😂😂 ogni singolo giorno uguale',tags:'#comedia #funny #italia #viral',sound:'Laughing - Sound Effect',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'CI'},
+  {c1:'#06D6A0',c2:'#073B4C',user:'chef_stellato',desc:'Piatto 3 stelle Michelin fatto in 10 minuti 🍽️⭐',tags:'#chef #michelin #cucina #gourmet',sound:'Classical - Vivaldi Spring',likes:'890.1K',comments:'34.5K',shares:'123.4K',initials:'CS'},
+  {c1:'#EF476F',c2:'#FFD166',user:'tramonto_sicilia',desc:'Il tramonto più bello della mia vita 🌅❤️ Sicilia',tags:'#tramonto #sicilia #italy #bellissimo',sound:'Tu Vuò Fa L\'Americano',likes:'1.4M',comments:'45.6K',shares:'234.5K',initials:'TS'},
+  {c1:'#118AB2',c2:'#073B4C',user:'deep_sea_it',desc:'A 400 metri nel Mediterraneo 🐙🌊 quello che abita lì sotto',tags:'#mare #fondo #esplorazione #natura',sound:'Deep Blue - Ambient',likes:'2.8M',comments:'89.1K',shares:'567K',initials:'DS'},
+  {c1:'#E63946',c2:'#A8DADC',user:'amore_toscano',desc:'Proposta di matrimonio in Toscana 💍😭 lui lo sapeva!',tags:'#matrimonio #toscana #amore #romantico',sound:'Con Te Partirò - Bocelli',likes:'4.5M',comments:'234.5K',shares:'890K',initials:'AT'},
+  {c1:'#5C4033',c2:'#FF8C00',user:'pizza_challenge',desc:'Ho provato le 10 migliori pizze d\'Italia 🍕🏆 classifica finale',tags:'#pizza #challenge #foodie #italia',sound:'Tarantella - Folk',likes:'3.1M',comments:'123.4K',shares:'567K',initials:'PC'},
+  {c1:'#4E148C',c2:'#E040FB',user:'illusione_ottica',desc:'La mia testa esplode 🤯 guardate fisso il centro per 30 sec',tags:'#illusione #ottica #mente #psych',sound:'Mysterious - Theremin',likes:'6.7M',comments:'345.6K',shares:'1.8M',initials:'IO'},
+  {c1:'#1B998B',c2:'#2D3A3A',user:'dolomiti_inverno',desc:'Dolomiti dall\'alto in inverno ❄️🏔️ che spettacolo',tags:'#dolomiti #montagna #inverno #neve',sound:'Wintergatan - Marble Machine',likes:'1.9M',comments:'56.7K',shares:'345K',initials:'DI'},
+  {c1:'#FF9F1C',c2:'#3A0CA3',user:'magia_di_strada',desc:'Questo mago mi ha distrutto la mente 🃏✨ come lo ha fatto?',tags:'#magia #street #mago #trick',sound:'Magic - Coldplay',likes:'8.9M',comments:'456.7K',shares:'2.3M',initials:'MS'},
+  {c1:'#0A9396',c2:'#001219',user:'aurora_boreale_ita',desc:'Aurora boreale fotografata in Piemonte 🌈 sembra un sogno',tags:'#aurora #piemonte #nord #notte',sound:'Northern Lights - Sigur Ros',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'AB'},
+  {c1:'#C9184A',c2:'#FFD166',user:'primo_sorriso',desc:'Il primo sorriso vero di mio figlio 👶😊 piango sempre',tags:'#neonato #sorriso #famiglia #amore',sound:'What a Wonderful World - Armstrong',likes:'12.3M',comments:'678.9K',shares:'3.4M',initials:'PS'},
+  {c1:'#22223B',c2:'#48CAE4',user:'record_mondiale',desc:'Il nuovo record mondiale di apnea 🌊😮 10 minuti sott\'acqua',tags:'#record #apnea #mondiale #incredibile',sound:'Breathe - Prodigy',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'RM'},
+  {c1:'#370617',c2:'#F15BB5',user:'fulmine_bellissimo',desc:'Il fulmine più bello mai filmato ⚡ 1 in un milione di scatti',tags:'#fulmine #temporale #natura #foto',sound:'Thunderstruck - AC/DC',likes:'7.8M',comments:'345.6K',shares:'2.1M',initials:'FB'},
+  {c1:'#2D6A4F',c2:'#FFBE0B',user:'danza_acqua',desc:'Danza contemporanea sull\'acqua del lago 💃🌊 magia vera',tags:'#danza #acqua #lago #arte',sound:'River Flows in You - Yiruma',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'DA'},
+  {c1:'#001219',c2:'#F15BB5',user:'squid_biolum',desc:'Calamari bioluminescenti nel porto di Genova 🦑💙',tags:'#calamaro #bioluminescenza #genova #mare',sound:'Under the Sea - Remix',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'SB'},
+  {c1:'#D62828',c2:'#90E0EF',user:'trampolino_olimpico',desc:'Il tuffo più bello dell\'anno 🤿 dai 10 metri in slow motion',tags:'#tuffo #olimpico #sport #slowmotion',sound:'Chariots of Fire - Vangelis',likes:'6.7M',comments:'234.5K',shares:'1.8M',initials:'TO'},
+  {c1:'#590D22',c2:'#00BBF9',user:'balena_liguria',desc:'Una balena a 50 metri dalla riva in Liguria 🐋 mai successo',tags:'#balena #liguria #mare #incredibile',sound:'Ocean Anthem - Ambient',likes:'9.8M',comments:'567.8K',shares:'2.8M',initials:'BL'},
+  {c1:'#073B4C',c2:'#F72585',user:'flash_mob_milan',desc:'Flashmob sorpresa in Duomo di Milano 💃🎵 5000 persone',tags:'#flashmob #milan #duomo #danza',sound:'Don\'t Stop Me Now - Queen',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'FM'},
+  {c1:'#6B4226',c2:'#4ADE80',user:'truffle_hunting',desc:'Caccia al tartufo bianco d\'Alba 🐕🍄 3000€ al kg',tags:'#tartufo #alba #piemonte #lusso',sound:'The Hunt - Acoustic',likes:'2.3M',comments:'89.1K',shares:'456K',initials:'TH'},
+  {c1:'#4A0E36',c2:'#90E0EF',user:'festival_lanterne',desc:'Festival delle lanterne a Torino 🏮✨ sembra Tokyo',tags:'#lanterne #torino #festival #luce',sound:'Lanterne di Notte - Piano',likes:'4.5M',comments:'178.9K',shares:'890K',initials:'FL'},
+  {c1:'#283618',c2:'#F15BB5',user:'nebbia_po',desc:'La nebbia del Po alle 6 di mattina 🌫️ tra i posti più belli d\'Italia',tags:'#nebbia #po #padana #paesaggio',sound:'Clair de Lune - Debussy',likes:'1.8M',comments:'67.8K',shares:'345K',initials:'NP'},
+  {c1:'#022B3A',c2:'#FBBF24',user:'gabbiani_sincroni',desc:'I gabbiani sincronizzati come droni 🕊️ come lo fanno?',tags:'#gabbiani #sincronizzati #natura #wow',sound:'Flock - Nature Documentary',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'GS'},
+  {c1:'#2B0504',c2:'#86EFAC',user:'acrobata_piazza',desc:'Acrobata di strada a Firenze 🤸‍♂️ finale: tutti in piedi',tags:'#acrobata #strada #firenze #arte',sound:'Circus - Britney Spears',likes:'5.6M',comments:'234.5K',shares:'1.2M',initials:'AP'},
+  {c1:'#0D1B2A',c2:'#FDE68A',user:'presepe_vivente',desc:'Il presepe vivente più grande d\'Italia 🌟 2000 figuranti',tags:'#presepe #vivente #natale #italia',sound:'O Holy Night - Classic',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'PV'},
+  {c1:'#480CA8',c2:'#FEE440',user:'mercato_rialto',desc:'Il mercato di Rialto alle 4 di notte 🐟🌙 rifornimento totale',tags:'#rialto #venezia #mercato #notte',sound:'O Sole Mio - Orchestral',likes:'1.4M',comments:'56.7K',shares:'345K',initials:'MR'},
+  {c1:'#344E41',c2:'#E040FB',user:'funghi_porcini',desc:'Trovato il porcino più grosso mai visto 🍄 chilo e mezzo',tags:'#fungo #porcino #bosco #record',sound:'O Sole Mio - Classic',likes:'2.1M',comments:'78.9K',shares:'456K',initials:'FP'},
+  {c1:'#1D3557',c2:'#FFD166',user:'solstizio_sole',desc:'Il sole che illumina Stonehenge italiana al solstizio ☀️🏛️',tags:'#solstizio #sole #storia #magia',sound:'Sun Is Rising - Ambient',likes:'3.4M',comments:'134.5K',shares:'678K',initials:'SS'},
+  {c1:'#480CA8',c2:'#FF9F1C',user:'ghiacciaio_it',desc:'Il ghiacciaio italiano si scioglie davanti ai miei occhi 🧊😢',tags:'#ghiacciaio #clima #italia #natura',sound:'Requiem - Mozart',likes:'2.3M',comments:'112.3K',shares:'567K',initials:'GI'},
+];
+
+// ================================================================
+//  UTILITÀ
+// ================================================================
+const $ = id => document.getElementById(id);
+
+
+// ── SEED FUNCTIONS: derivano seed numerici dal codice sessione ───────────
+function magoSeed(code) {
+  var h = 5381;
+  var s = (code || '') + 'M';
+  for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h) + 1;
+}
+function spettSeed(code) {
+  var h = 5381;
+  var s = (code || '') + 'S';
+  for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h) + 1;
+}
+function condivisiSeed(code) {
+  var h = 5381;
+  var s = (code || '') + 'C';
+  for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h) + 1;
+}
+
+// ── SEEDED SHUFFLE: Fisher-Yates deterministico ───────────────────────────
+function seededShuffle(arr, seed) {
+  var a = arr.slice();
+  var s = seed >>> 0;
+  for (var i = a.length - 1; i > 0; i--) {
+    s = ((s * 1664525) + 1013904223) >>> 0;
+    var j = s % (i + 1);
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+// ── GENCODE: genera codice sessione 4 lettere ─────────────────────────────
+function genCode() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  var code = '';
+  for (var i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// ── CODETOTOPIC: codice → topic ntfy ─────────────────────────────────────
+function codeToTopic(code) {
+  return 'reelsync-magic-' + (code || '').toLowerCase();
+}
+
+// ── NTFYSEND: invia messaggio ntfy (SENZA Content-Type) ──────────────────
+function ntfySend(topic, payload, onResult) {
+  fetch('https://ntfy.sh/' + topic, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+    // NO Content-Type: evita CORS preflight
+  }).then(function(r) {
+    if (onResult) onResult(r.ok ? 'ok ' + r.status : 'http ' + r.status);
+  }).catch(function(e) {
+    if (onResult) onResult('errore: ' + (e && e.message ? e.message : 'rete'));
+  });
+}
+
+// ── CREATEPOLLER: polling ntfy ogni 2s (SENZA lastSince) ─────────────────
+function createPoller(topic) {
+  var _interval = null;
+  var _cb = null;
+  // since="10m": durata relativa basata sull'orologio del SERVER ntfy
+  // (un timestamp del client fallirebbe se gli orologi sono disallineati).
+  var _dbg = null;            // callback debug opzionale
+  var _pollN = 0, _msgN = 0;
+  function _poll() {
+    _pollN++;
+    fetch('https://ntfy.sh/' + topic + '/json?poll=1&since=10m')
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(text) {
+        (text || '').trim().split('\n').forEach(function(line) {
+          if (!line.trim()) return;
+          try {
+            var msg = JSON.parse(line);
+            if (msg && msg.event === 'message' && msg.message && _cb) {
+              _msgN++;
+              try { _cb(JSON.parse(msg.message)); } catch(e) {}
+            }
+          } catch(e) {}
+        });
+        if (_dbg) _dbg('poll #' + _pollN + ' ok · msg: ' + _msgN);
+      })
+      .catch(function(err) {
+        if (_dbg) _dbg('poll #' + _pollN + ' errore: ' + err.message);
+      });
+  }
+  return {
+    start: function(cb) {
+      _cb = cb;
+      _poll();
+      _interval = setInterval(_poll, 2000);
+    },
+    stop: function() {
+      if (_interval) { clearInterval(_interval); _interval = null; }
+      _cb = null;
+    },
+    setDebug: function(fn) { _dbg = fn; }
+  };
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $(id).classList.add('active');
+}
+// ================================================================
+//  FEED RENDERER
+// ================================================================
+// Genera metriche realistiche e variate: viral, popular, medium, small
+function _eng(hash) {
+  // Proporzioni TikTok REALISTICHE: likes >> saves >= comments >> shares
+  var h2 = ((hash >> 3) ^ (hash * 1103515245)) >>> 0;
+  var h3 = ((hash >> 7) ^ (h2 * 22695477)) >>> 0;
+  var h4 = ((hash >> 11) ^ (h3 * 1664525)) >>> 0;
+  var tier = hash % 100;
+
+  function fmt(n) {
+    if (n >= 1000000) return (n/1000000).toFixed(1).replace('.0','') + 'M';
+    if (n >= 10000)   return Math.round(n/1000) + 'K';
+    if (n >= 1000)    return (n/1000).toFixed(1).replace('.0','') + 'K';
+    return '' + Math.max(1, n);
+  }
+
+  var likes, comments, shares, saves;
+
+  if (tier < 12) {
+    // Mega viral (12%): 1M-5M
+    likes    = (h2 % 41 + 10) * 100000;
+    comments = Math.round(likes * (0.04 + (h3%7)*0.005));   // 4-7.5%
+    shares   = Math.round(likes * (0.015 + (h4%6)*0.003));  // 1.5-3%
+    saves    = Math.round(likes * (0.06 + (h3%8)*0.005));   // 6-9.5%
+  } else if (tier < 35) {
+    // Viral (23%): 100K-999K
+    likes    = (h2 % 900 + 100) * 1000;
+    comments = Math.round(likes * (0.05 + (h3%8)*0.006));   // 5-9.5%
+    shares   = Math.round(likes * (0.02 + (h4%7)*0.004));   // 2-4.5%
+    saves    = Math.round(likes * (0.07 + (h3%8)*0.007));   // 7-12.5%
+  } else if (tier < 65) {
+    // Popular (30%): 10K-99K
+    likes    = (h2 % 89 + 10) * 1000 + (h3 % 999);
+    comments = Math.round(likes * (0.07 + (h3%8)*0.008));   // 7-12.5%
+    shares   = Math.round(likes * (0.03 + (h4%7)*0.005));   // 3-6.5%
+    saves    = Math.round(likes * (0.08 + (h3%8)*0.009));   // 8-14.5%
+  } else if (tier < 88) {
+    // Medium (23%): 1K-9.9K
+    likes    = (h2 % 8900 + 1000);
+    comments = Math.round(likes * (0.10 + (h3%8)*0.010));   // 10-17.5%
+    shares   = Math.round(likes * (0.04 + (h4%7)*0.006));   // 4-8.5%
+    saves    = Math.round(likes * (0.10 + (h3%8)*0.010));   // 10-17.5%
+  } else {
+    // Small (12%): 200-999
+    likes    = (h2 % 800 + 200);
+    comments = Math.round(likes * (0.12 + (h3%8)*0.012));   // 12-21.5%
+    shares   = Math.round(likes * (0.05 + (h4%7)*0.008));   // 5-10.5%
+    saves    = Math.round(likes * (0.10 + (h3%8)*0.010));   // 10-17.5%
+  }
+
+  return {
+    likes:    fmt(likes),
+    comments: fmt(Math.max(1, comments)),
+    shares:   fmt(Math.max(1, shares)),
+    saves:    fmt(Math.max(1, saves))
+  };
+}
+
+
+function vidHash(v) {
+  let h = 0;
+  const s = v.user + v.initials;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// Genera metriche realistiche e variate: viral, popular, medium, small
+
+function createSlide(v) {
+  // Slide contiene SOLO immagine e vignette — sidebar/info sono fissi fuori
+  const seed   = encodeURIComponent(v.user.replace(/[^a-zA-Z0-9]/g,''));
+  const h      = vidHash(v);
+  const e      = _eng(h);
+  const imgUrl = 'https://picsum.photos/seed/'+seed+'/390/844';
+  const avUrl  = 'https://picsum.photos/seed/'+seed+'av/52/52';
+  const s      = document.createElement('div');
+  s.className  = 'video-slide';
+  // Dati video come data-attributes (letti da updateOverlay al cambio slide)
+  s.dataset.user  = v.user;
+  s.dataset.desc  = v.desc;
+  s.dataset.tags  = v.tags;
+  s.dataset.sound = v.sound;
+  s.dataset.likes = e.likes;
+  s.dataset.comm  = e.comments;
+  s.dataset.shar  = e.shares;
+  s.dataset.saves = e.saves;
+  s.dataset.av    = avUrl;
+  s.innerHTML = '<img class="slide-img" src="'+imgUrl+'" loading="lazy" decoding="async"><div class="tk-vignette"></div>';
+  return s;
+}
+
+// Aggiorna sidebar e info fissi + precarica immagine slide successiva
+function updateOverlay(prefix, slidesEl, idx) {
+  const sl = slidesEl.querySelectorAll('.video-slide')[idx];
+  if (!sl) return;
+  const d = sl.dataset;
+  // Info
+  const uEl = document.getElementById(prefix+'-user');
+  if (uEl) uEl.innerHTML = '@'+d.user+' <span class="tk-verified">\u2713</span>';
+  const dEl = document.getElementById(prefix+'-desc');  if (dEl) dEl.textContent = d.desc;
+  const tEl = document.getElementById(prefix+'-tags');  if (tEl) tEl.textContent = d.tags;
+  const sEl = document.getElementById(prefix+'-sound'); if (sEl) sEl.textContent = d.sound;
+  // Sidebar
+  const avEl = document.getElementById(prefix+'-av');   if (avEl) avEl.src = d.av;
+  const dcEl = document.getElementById(prefix+'-disc'); if (dcEl) dcEl.src = d.av;
+  const lnEl = document.getElementById(prefix+'-like-n');    if (lnEl) lnEl.textContent = d.likes;
+  const cnEl = document.getElementById(prefix+'-comment-n'); if (cnEl) cnEl.textContent = d.comm;
+  const bnEl = document.getElementById(prefix+'-bookmark-n');if (bnEl) bnEl.textContent = d.saves || d.shar;
+  const snEl = document.getElementById(prefix+'-share-n');   if (snEl) snEl.textContent = d.shar;
+  // Reset liked state al cambio slide
+  ['like','bookmark'].forEach(t => {
+    const el = document.getElementById(prefix+'-'+t);
+    if (el) el.classList.remove('liked');
+  });
+  // Preloading rimosso: causava memory pressure su iOS 26
+}
+
+function buildFeed(el, videos, prefix) {
+  el.innerHTML = ''; el.style.transform = 'translateY(0)';
+  videos.forEach((v, i) => {
+    const s = createSlide(v);
+    if (i === 0) {
+      s.classList.add('active'); // prima slide attiva → Ken Burns parte subito
+      s.querySelectorAll('img').forEach(img => { img.loading='eager'; });
+    }
+    el.appendChild(s);
+  });
+  // Aggiorna subito sidebar+info col primo slide
+  if (prefix) updateOverlay(prefix, el, 0);
+}
+
+// Avvia/pausa video in base alla slide visibile
+function updateVideoForSlide(slidesEl, idx) {
+  const slides = slidesEl.querySelectorAll('.video-slide');
+  slides.forEach((s, i) => {
+    const vid = s.querySelector('.slide-vid');
+    const img = s.querySelector('.slide-img');
+    if (!vid) return;
+    if (i === idx) {
+      // Slide corrente: carica e avvia video se ha src
+      if (vid.dataset.src && !vid.src) {
+        vid.src = vid.dataset.src;
+        vid.load();
+        vid.addEventListener('canplay', function once() {
+          vid.removeEventListener('canplay', once);
+          vid.classList.add('ready');
+          if (img) img.classList.add('hidden');
+          vid.play().catch(() => {});
+        }, { once: true });
+      } else if (vid.src) {
+        vid.play().catch(() => {});
+      }
+    } else {
+      // Altra slide: pausa
+      if (vid.src) { try { vid.pause(); } catch(e) {} }
+    }
+  });
+}
+
+// Aggiorna i slide FUTURI senza toccare la posizione corrente
+// → usato all'attivazione della coincidenza
+function patchFeedRelative(slidesEl, fromIdx, count, condivisiVideos, prefix) {
+  const coincAbs = fromIdx + count - 1;
+  const all = Array.from(slidesEl.querySelectorAll('.video-slide'));
+  all.slice(coincAbs).forEach(s => s.remove());
+  condivisiVideos.forEach(v => slidesEl.appendChild(createSlide(v)));
+  if (prefix) updateOverlay(prefix, slidesEl, fromIdx);
+}
+
+// ================================================================
+//  SWIPE ENGINE — blocca pull-to-refresh, scorre su e giù
+// ================================================================
+function makeSwiper(container, slidesEl, getCount, onArrive) {
+  var idx = 0;
+  var _lastClose = 0;
+  container._blockPanel = function(ms) { _lastClose = Date.now() + ms; };
+
+  function getH() {
+    var s = slidesEl.querySelector('.video-slide');
+    return (s && s.offsetHeight > 0) ? s.offsetHeight : (window._SLIDE_H || window.innerHeight);
+  }
+
+  function goTo(n, instant) {
+    var count = getCount();
+    idx = Math.max(0, Math.min(n, count - 1));
+    var h = getH();
+    if (instant) {
+      slidesEl.style.transition = 'none';
+      slidesEl.style.transform  = 'translateY(-' + (idx * h) + 'px)';
+      setTimeout(function(){ slidesEl.style.transition = ''; }, 50);
+    } else {
+      slidesEl.style.transform = 'translateY(-' + (idx * h) + 'px)';
+    }
+    // Marca SOLO la slide corrente come .active (Ken Burns gira solo lì)
+    var allSlides = slidesEl.querySelectorAll('.video-slide');
+    for (var _i = 0; _i < allSlides.length; _i++) {
+      if (_i === idx) allSlides[_i].classList.add('active');
+      else allSlides[_i].classList.remove('active');
+    }
+    if (onArrive) onArrive(idx);
+  }
+
+  // ── MOBILE / TABLET: touch swipe (tutti PASSIVE → zero crash iOS 26) ──
+  // Uno swipe valido deve essere: prevalentemente verticale, ampio (>55px),
+  // e rapido. Così un doppio-tap per il cuore NON viene mai letto come swipe.
+  var startY = 0, startX = 0, startT = 0, dragging = false;
+  container.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    startT = Date.now();
+    dragging = true;
+  }, { passive: true });
+
+  container.addEventListener('touchmove', function(e) {
+    // Niente preventDefault → passive: iOS non ricarica la pagina
+  }, { passive: true });
+
+  container.addEventListener('touchend', function(e) {
+    if (!dragging) return; dragging = false;
+    var dy = startY - e.changedTouches[0].clientY;   // + = su (reel succ.)
+    var dx = e.changedTouches[0].clientX - startX;   // movimento orizzontale
+    var dt = Date.now() - startT;                    // durata gesto
+
+    var absY = Math.abs(dy), absX = Math.abs(dx);
+
+    // È uno swipe SOLO se:
+    //  1. ampiezza verticale > 55px  (un tap, anche energico, sta sotto)
+    //  2. movimento prevalentemente verticale (absY > absX * 1.3)
+    //  3. gesto non troppo lento (< 600ms = vero swipe, non drag lento/tap fermo)
+    var isSwipe = absY > 55 && absY > absX * 1.3 && dt < 600;
+    if (isSwipe) {
+      goTo(idx + (dy > 0 ? 1 : -1));
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchcancel', function() {
+    dragging = false;
+  }, { passive: true });
+
+  // ── CLICK / ROTELLA / TASTIERA (desktop) ──────────────────────────────
+  // Non disabilitiamo per "touch device" (rilevamento fragile). Invece il
+  // click sintetico che segue un vero tocco viene ignorato via timestamp.
+  function _isUI(t) {
+    return !t || t.closest('.tk-action') || t.closest('.tk-av-wrap') ||
+           t.closest('.bottom-nav') || t.closest('.fake-sheet') ||
+           t.closest('#control-panel') || t.closest('#secret-zone') ||
+           t.closest('#home-zone') || t.closest('.tk-sound') ||
+           t.closest('.tk-username') || t.closest('.fk-sheet');
+  }
+
+  // Marca quando avviene un vero tocco (per ignorare il click sintetico dopo)
+  var _lastRealTouch = 0;
+  container.addEventListener('touchend', function() {
+    _lastRealTouch = Date.now();
+  }, { passive: true });
+
+  // CLICK: singolo = scorri (alto indietro / basso avanti), doppio = cuore.
+  // Il rilevamento doppio-click evita che 2 click ravvicinati scorrano 2 reel.
+  var _clkCount = 0, _clkTimer = null, _clkY = 0;
+  container.addEventListener('click', function(e) {
+    if (Date.now() - _lastRealTouch < 700) return;  // click sintetico post-touch → ignora
+    if (Date.now() < _lastClose) return;
+    if (_isUI(e.target)) return;
+
+    _clkY = e.clientY;
+    _clkCount++;
+
+    if (_clkCount === 1) {
+      _clkTimer = setTimeout(function() {
+        _clkCount = 0;
+        var rect = container.getBoundingClientRect();
+        var y = _clkY - rect.top;
+        if (y < rect.height * 0.35) goTo(idx - 1);   // alto = indietro
+        else                        goTo(idx + 1);   // resto = avanti
+      }, 260);
+    } else {
+      // Secondo click entro 260ms → doppio click → cuore, niente scroll
+      clearTimeout(_clkTimer);
+      _clkCount = 0;
+      if (container._doHeart) container._doHeart();
+    }
+  });
+  container.style.cursor = 'pointer';
+
+  // ROTELLA mouse
+  var _wheelLock = false;
+  container.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    if (_wheelLock) return;
+    _wheelLock = true;
+    setTimeout(function() { _wheelLock = false; }, 500);
+    goTo(idx + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
+
+  // FRECCE tastiera + Spazio (solo se questo feed è nella view attiva)
+  window.addEventListener('keydown', function(e) {
+    if (!container.offsetParent) return;   // container nascosto → ignora
+    if (e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault(); goTo(idx + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault(); goTo(idx - 1);
+    }
+  });
+
+  // ── RESIZE: ricalibra posizione ───────────────────────────────────────
+  // Resize: solo se l'altezza è davvero cambiata (es. orientamento)
+  window.addEventListener('resize', function() {
+    var h = getH();
+    var prevH = window._SLIDE_H || h;
+    if (h > 0 && Math.abs(h - prevH) > 5) {
+      window._SLIDE_H = h;
+      document.documentElement.style.setProperty('--slide-h', h + 'px');
+      slidesEl.style.transition = 'none';
+      slidesEl.style.transform  = 'translateY(-' + (idx * h) + 'px)';
+      setTimeout(function(){ slidesEl.style.transition = ''; }, 100);
+    }
+  }, { passive: true });
+
+  return { goTo: goTo, getIdx: function() { return idx; } };
+}
+
+
+function initMagoHome() {
+  let currentCode = null;
+  $('btn-performance').addEventListener('click', () => {
+    currentCode = genCode();
+    showCodeScreen(currentCode);
+  });
+}
+
+// ================================================================
+//  MAGO: SCHERMATA CODICE
+// ================================================================
+function showCodeScreen(code) {
+  // Mostra le 4 lettere
+  const letters = document.querySelectorAll('#code-display .code-letter');
+  code.split('').forEach((ch, i) => { if(letters[i]) letters[i].textContent = ch; });
+
+  // Mostra URL da digitare. In contesti anteprima/srcdoc location.origin è
+  // "null" e pathname è "srcdoc": in quel caso usa l'URL reale del sito.
+  let _base;
+  if (/^https?:/.test(location.origin) && location.hostname) {
+    _base = location.origin + location.pathname;
+  } else {
+    _base = 'https://jacknobilevideo-hub.github.io/Reelsync/';
+  }
+  if (_base.slice(-1) !== '/' && _base.indexOf('?') < 0 && !/\.html?$/.test(_base)) _base += '/';
+  const spectUrl = _base + '?s=' + code;
+  $('code-url-text').textContent = spectUrl;
+
+  showView('view-code');
+
+  const topic = codeToTopic(code);
+  let viewerReady = false;
+
+  // Ascolta spettatore
+  const poller = createPoller(topic);
+  poller.setDebug(function(info) {
+    var d = document.getElementById('code-debug');
+    if (d && !viewerReady) d.textContent = 'canale …' + topic.slice(-12) + ' · ' + info;
+  });
+  poller.start(msg => {
+    if (msg.type === 'join' && !viewerReady) {
+      viewerReady = true;
+      $('code-dot').classList.add('live');
+      $('code-status').textContent = 'Spettatore connesso ✓';
+      var d = document.getElementById('code-debug');
+      if (d) d.textContent = '';
+    }
+  });
+
+  $('open-btn').onclick = () => {
+    poller.stop(); // Ferma il poller del code screen (evita doppio polling in initMagoFeed)
+    history.replaceState(null, '', '?m=' + code);
+    initMagoFeed(code, topic);
+  };
+}
+
+// ================================================================
+//  MAGO: FEED
+// ================================================================
+function initMagoFeed(code, topic) {
+  showView('view-mago-feed');
+  const ms    = magoSeed(code);
+  const cs    = condivisiSeed(code);
+  const mVids = seededShuffle(MAGO_POOL, ms).slice(0, 50);
+  const cVids = seededShuffle(CONDIVISI_POOL, cs).slice(0, 15);
+  let state   = { videos: [...mVids, ...cVids] };
+
+  const slidesEl = $('mago-slides');
+  buildFeed(slidesEl, state.videos, 'mago');
+
+  // coincIdx: posizione assoluta della coincidenza (impostata al trigger)
+  let coincIdx  = null;
+  let flashed   = false;
+  let armed     = false;     // true dopo aver selezionato il numero
+  let idleTimer = null;
+  let selectedNum = null;
+
+  initFakeInteractions($('mago-container'), slidesEl);
+  const sw = makeSwiper($('mago-container'), slidesEl, () => state.videos.length,
+    (i) => {
+      if (armed) resetIdleTimer(); // resetta il countdown ad ogni scroll
+      updateOverlay('mago', slidesEl, i);
+      if (coincIdx !== null && i === coincIdx && !flashed) {
+        flashed = true; hideDot();
+      }
+    }
+  );
+
+  // Spia countdown — pallino che lampeggia durante i 5 secondi, poi fisso
+  let dotInterval = null;
+  const dot = $('mago-dot');
+
+  function hideDot() {
+    clearInterval(dotInterval);
+    dot.style.display = 'none';
+    dot.classList.remove('blinking');
+  }
+
+  // Timer 5 secondi — scatta dopo 5 secondi senza scorrere
+  function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    clearInterval(dotInterval);
+
+    // Mostra il pallino che lampeggia
+    dot.style.display = 'block';
+    dot.classList.add('blinking');
+
+    idleTimer = setTimeout(doActivate, 7000);
+  }
+
+  function doActivate() {
+    if (!armed || selectedNum === null) return;
+    armed = false;
+
+    // Smette di lampeggiare — resta fisso bianco fino alla coincidenza
+    clearInterval(dotInterval);
+    dot.classList.remove('blinking');
+    dot.style.display = 'block';
+
+    const fromIdx  = sw.getIdx();
+    coincIdx       = fromIdx + selectedNum - 1;
+    state.videos   = [...mVids.slice(0, coincIdx), ...cVids];
+    patchFeedRelative(slidesEl, fromIdx, selectedNum, cVids, 'mago');
+
+    ntfySend(topic, { type: 'activate', n: selectedNum, ts: Date.now() });
+  }
+
+  // Mostra codice nel pannello
+  const pcEl = $('panel-code-display');
+  code.split('').forEach(ch => {
+    const d = document.createElement('div');
+    d.className = 'panel-code-letter'; d.textContent = ch;
+    pcEl.appendChild(d);
+  });
+
+  // Pannello segreto: triplice tap angolo alto destra
+  // Zona DESTRA (alto dx): 3 tap veloci → apre pannello
+  // Le zone segrete contano solo TAP REALI (no swipe, no doppio conteggio).
+  // Helper: registra un tap solo se il dito NON si è mosso (< 12px) e usa
+  // un solo tipo di evento per non contare due volte lo stesso tocco.
+  var _touchDev = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+  function bindSecretZone(elId, onTriple) {
+    var el = $(elId);
+    if (!el) return;
+    var count = 0, timer = null, sx = 0, sy = 0, moved = false;
+
+    if (_touchDev) {
+      el.addEventListener('touchstart', function(e) {
+        sx = e.touches[0].clientX; sy = e.touches[0].clientY; moved = false;
+      }, { passive: true });
+      el.addEventListener('touchmove', function(e) {
+        if (Math.abs(e.touches[0].clientX - sx) > 12 ||
+            Math.abs(e.touches[0].clientY - sy) > 12) moved = true;
+      }, { passive: true });
+      el.addEventListener('touchend', function() {
+        if (moved) { count = 0; return; }   // era uno swipe → ignora
+        count++; clearTimeout(timer);
+        timer = setTimeout(function(){ count = 0; }, 600);
+        if (count >= 3) { count = 0; onTriple(); }
+      }, { passive: true });
+    } else {
+      el.addEventListener('click', function() {
+        count++; clearTimeout(timer);
+        timer = setTimeout(function(){ count = 0; }, 600);
+        if (count >= 3) { count = 0; onTriple(); }
+      });
+    }
+  }
+
+  bindSecretZone('secret-zone', openPanel);
+  bindSecretZone('home-zone', function() {
+    history.replaceState(null, '', location.pathname);
+    location.reload();
+  });
+  const panel = $('control-panel');
+  $('panel-bg').addEventListener('click', closePanel);
+  $('close-btn').addEventListener('click', closePanel);
+  $('exit-btn').addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname);
+    location.reload();
+  });
+  function openPanel()  { panel.classList.add('open'); }
+  function closePanel() {
+    panel.classList.remove('open');
+    // Blocca click fantasma iOS per 600ms (300ms delay + margine)
+    const mc = $('mago-container');
+    if (mc && mc._blockPanel) mc._blockPanel(600);
+  }
+
+  // Back trap: 8 stati buffer — abbastanza da assorbire swipe--back iOS senza flash bianco
+  // (il flash bianco era causato da visibilitychange che ora è RIMOSSO)
+  // Back trap rimosso: su iOS 26 pushState/popstate confligge con i gesti Safari
+
+  // Griglia numeri 1-20
+  const grid = $('num-grid');
+  for (let i = 1; i <= 50; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'num-btn'; btn.textContent = i;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel'); selectedNum = i;
+      $('activate-btn').disabled = false;
+    });
+    grid.appendChild(btn);
+  }
+
+  // PREMI IL TASTO → arma il timer 5 secondi, chiudi pannello
+  // Da quel momento puoi scorrere liberamente.
+  // Dopo 5 secondi senza scorrere → scatta la coincidenza in silenzio.
+  $('activate-btn').onclick = () => {
+    if (!selectedNum) return;
+    armed = true;
+    closePanel();
+    resetIdleTimer();   // parte il conto alla rovescia
+  };
+
+  // Ascolta spettatore
+  const poller = createPoller(topic);
+  poller.start(msg => {
+    if (msg.type === 'join') {
+      $('panel-dot').classList.add('live');
+      $('panel-status').textContent = 'Spettatore connesso ✓';
+    }
+  });
+}
+
+// ================================================================
+//  SPETTATORE: FEED DIRETTO
+// ================================================================
+function initSpettFeed(code) {
+  // DEBUG: banner visibile subito, prima di qualsiasi cosa possa fallire
+  function _spettDbg(txt) {
+    var b = document.getElementById('spett-join-dbg');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'spett-join-dbg';
+      b.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:2000000;'
+        + 'background:rgba(0,0,0,.9);color:#0f0;font:12px monospace;padding:8px;'
+        + 'border-radius:8px;text-align:center;pointer-events:none;white-space:pre-wrap';
+      document.body.appendChild(b);
+    }
+    b.textContent = txt;
+  }
+  _spettDbg('spett avviato · code=' + code);
+
+  try {
+  showView('view-spett-feed');
+  const ss    = spettSeed(code);
+  const cs    = condivisiSeed(code);
+  const sVids = seededShuffle(SPETT_POOL, ss).slice(0, 50);
+  const cVids = seededShuffle(CONDIVISI_POOL, cs).slice(0, 15);
+  let state   = { videos: [...sVids, ...cVids] };
+
+  const slidesEl = $('spett-slides');
+  buildFeed(slidesEl, state.videos, 'spett');
+
+  let coincIdx = null;
+
+  initFakeInteractions($('spett-container'), slidesEl);
+  const sw = makeSwiper($('spett-container'), slidesEl, () => state.videos.length, (i) => { updateOverlay('spett', slidesEl, i); });
+
+  // Annuncia presenza al mago — 3 tentativi distanziati per robustezza
+  const topic = codeToTopic(code);
+  _spettDbg('spett · code=' + code + '\ncanale …' + topic.slice(-14) + '\ninvio join...');
+  const sendJoin = () => ntfySend(topic, { type: 'join', ts: Date.now() },
+    function(res) { _spettDbg('spett · code=' + code + '\ncanale …' + topic.slice(-14) + '\njoin: ' + res); });
+  sendJoin();                        // subito
+  setTimeout(sendJoin,  5000);       // +5s
+  setTimeout(sendJoin, 15000);       // +15s
+
+  // Ascolta attivazione
+  let activated = false;
+  const poller  = createPoller(topic);
+  poller.start(msg => {
+    if (msg.type === 'activate' && !activated) {
+      // Ignora messaggi vecchi (> 10 minuti) da sessioni precedenti
+      if (msg.ts && (Date.now() - msg.ts) > 600000) return;
+
+      activated = true;
+      const n          = msg.n;                 // numero scelto dallo spettatore
+      const fromIdx    = sw.getIdx();           // posizione attuale spettatore
+      coincIdx         = fromIdx + n - 1;       // posizione assoluta della coincidenza
+
+      state.videos = [...sVids.slice(0, coincIdx), ...cVids];
+      patchFeedRelative(slidesEl, fromIdx, n, cVids, 'spett');
+      // Nessun salto, nessun flash — scatta naturalmente scorrendo
+    }
+  });
+  } catch (err) {
+    _spettDbg('ERRORE spett:\n' + (err && err.message ? err.message : err)
+      + '\n' + (err && err.stack ? err.stack.split('\n')[1] || '' : ''));
+  }
+}
+
+// ── ROUTING: decide cosa mostrare in base all'URL ──────────────────────────
+// Eseguito DOPO il caricamento completo della pagina, così TUTTE le funzioni
+// (anche quelle definite in blocchi <script> successivi, come
+// initFakeInteractions) sono già disponibili quando initSpettFeed/initMagoFeed
+// le richiamano. Altrimenti lo spettatore crasherebbe con "... is not defined".
+// ── ROUTING: spostato alla fine dell'ultimo <script> (vedi in fondo) ──
+// così TUTTE le funzioni sono già definite quando viene eseguito.
+</script>
+<!-- SPLASH FULLSCREEN — tap per iniziare + attiva schermo intero -->
+<div id="splash" onclick="__splashGo()" ontouchend="__splashGo()">
+  <div class="splash-logo">Reel<span>Sync</span></div>
+  <div class="splash-pulse">▶</div>
+  <div class="splash-tap">Tocca lo schermo per iniziare</div>
+</div>
+
+<script>
+// ── SPLASH MANAGER ─────────────────────────────────────────────
+// __splashGo è globale così l'inline handler può chiamarla sempre
+var __splashDone = false;
+var __splashAt   = 0;
+
+function __splashGo() {
+  if (__splashDone) return;
+  __splashDone = true;
+  __splashAt   = Date.now();
+
+  var splash = document.getElementById('splash');
+  if (splash) splash.style.display = 'none';
+
+  // Fullscreen solo su Android — su iOS Safari il fullscreenchange
+  // viene emesso durante lo scroll (URL bar show/hide) → la splash ricompare.
+  // Rilevamento iOS: userAgent o MacIntel + touch (iPad)
+  var _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!_isIOS) {
+    try {
+      var el  = document.documentElement;
+      var req = el.requestFullscreen
+             || el.webkitRequestFullscreen
+             || el.mozRequestFullScreen
+             || el.msRequestFullscreen;
+      if (req) { var p = req.call(el); if (p && p.catch) p.catch(function(){}); }
+    } catch(e) {}
+  }
+}
+
+// Reset splash: solo su fullscreenchange (Android) e pageshow bfcache
+// NON gestiamo visibilitychange — causa falsi positivi su iOS con animazione barra URL
+(function() {
+  // Android fullscreen exit → mostra splash (solo su Android, non iOS)
+  // Su iOS il fullscreenchange viene emesso durante lo scroll → NON gestiamo
+  var _isIOS2 = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!_isIOS2) {
+    ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev) {
+      document.addEventListener(ev, function() {
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        // Non mostrare splash se siamo in una sessione mago o spettatore
+        var inSession = location.search.indexOf('m=') >= 0 || location.search.indexOf('s=') >= 0;
+        if (!isFs && __splashDone && !inSession) {
+          document.getElementById('splash').style.display = 'flex';
+          __splashDone = false;
+        }
+      });
+    });
+  }
+
+  // pageshow rimosso: auto-dismiss gestisce il ritorno
+})();
+
+// ================================================================
+//  INTERAZIONI FAKE
+// ================================================================
+// ── INTERAZIONI FAKE COMPLETE ──────────────────────────────────
+// name, comment, verified(bool)
+const _fakeComments = [
+  ['giulia_romanelli','Questo mi ha fatto venire la pelle d\'oca 😭❤️', true],
+  ['marco.visentin','Non ci credo ancora, guardato 5 volte 🔥', false],
+  ['ale_fit22','Aspetta ma come è possibile???', false],
+  ['ludovica.style','Condivido subito alle amiche 😍', false],
+  ['fede_dance_','Sto piangendo è troppo bello', false],
+  ['nico_beats_','Facts 💯💯 questo è reale', false],
+  ['sara.fotografa','Questo account è oro puro, seguitelo', true],
+  ['tommaso_sk8','FRATELLO NO DIMMI CHE È FINTO', false],
+  ['viola_foodie','Mi ha dato i brividi per davvero', false],
+  ['dani_artstudio','Questo è talento vero 🎨', true],
+  ['reels.italia.top','Ma il tuo account ha quanti anni??', false],
+  ['federico_g','Salvato e condiviso 🔖', false],
+  ['chiara__c','Ogni volta che lo guardo mi sorprende 😳', false],
+  ['matteo.ricci92','Ho mostrato ai miei genitori e sono rimasti senza parole', false],
+  ['valeria.mo','Seriamente uno dei migliori che ho visto 🙌', true],
+  ['xkylexhunterx','bro this is insane 🤯🤯', false],
+  ['sofia_bianchi_','non smetto di guardarlo aiuto 😭', false],
+  ['jason.d.official','ok this just broke my brain 💀', true],
+  ['ilaria_v','ti prego come hai fatto???', false],
+  ['luca.m.official','Questo merita milioni di view', true],
+  ['emiliarocca_','Ho mostrato a tutti in ufficio 😂', false],
+  ['carla_m','Bellissimo!! ❤️❤️❤️', false],
+  ['pablito_mx','increíble 😍 genio total', false],
+  ['mr.trevisan','Ma... aspetta... no... 😂', false],
+  ['anna_di_firenze','Ogni volta mi fermo e guardo di nuovo', false],
+  ['davide_creator','Questo tipo è un fenomeno', true],
+  ['nina.b.official','lo ha già visto mezzo ufficio mio 😅', false],
+  ['ricc4rdo_','CONTE DEL LIKE immediato', false],
+  ['laur4_style','MA COME SI FA 😭😭', false],
+  ['g10rgio.f','Uno dei migliori account qui', true],
+];
+
+function closeFakeOverlay(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+let _profFollowing = false;
+function toggleFollow() {
+  _profFollowing = !_profFollowing;
+  const btn = document.getElementById('prof-follow-btn');
+  btn.textContent = _profFollowing ? '✓ Segui già' : 'Segui';
+  btn.className = 'prof-follow ' + (_profFollowing ? 'in' : 'out');
+}
+
+function _rndK(min,max) { return (min + Math.random()*(max-min)).toFixed(1)+'K'; }
+
+function initFakeInteractions(container, slidesEl) {
+  const burst = document.getElementById('heart-burst');
+  let lastTap = 0, lastTapX = 0, lastTapY = 0;
+  var _tapStartX = 0, _tapStartY = 0; // per distinguere tap da swipe
+
+  // Cuore + like, condiviso tra doppio-tap (mobile) e doppio-click (desktop)
+  container._doHeart = function() {
+    burst.style.left = Math.round(window.innerWidth  / 2 - 50) + 'px';
+    burst.style.top  = Math.round(window.innerHeight / 2 - 50) + 'px';
+    burst.classList.remove('pop');
+    void burst.offsetWidth;
+    burst.classList.add('pop');
+    var lb = container.querySelector('.tk-action[data-type="like"]');
+    if (lb && !lb.classList.contains('liked')) {
+      lb.classList.add('liked');
+      var cnt = lb.querySelector('.tk-count');
+      if (cnt) { var n = parseFloat(cnt.textContent)||0; cnt.textContent = (n+.1).toFixed(1)+'K'; }
+    }
+  };
+
+  // Registra punto di partenza del touch
+  container.addEventListener('touchstart', function(e) {
+    _tapStartX = e.touches[0].clientX;
+    _tapStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  function curSlide() {
+    var s = slidesEl.querySelector('.video-slide');
+    var h = (s && s.offsetHeight > 0) ? s.offsetHeight : (window._SLIDE_H || window.innerHeight);
+    var cidx = h > 0 ? Math.round(-parseFloat(slidesEl.style.transform||'0') / h) : 0;
+    return slidesEl.querySelectorAll('.video-slide')[cidx] || null;
+  }
+
+  function openComments() {
+    const fcList = document.getElementById('fc-list');
+    fcList.innerHTML = '';
+    // Numero e ordine commenti stabili per slide (non cambiano ogni apertura)
+    var sl = curSlide();
+    var seed = sl ? (sl.dataset.user||'').split('').reduce(function(h,c){return((h<<5)-h+c.charCodeAt(0))|0;},0) : 42;
+    seed = Math.abs(seed);
+    const n = (seed % 8) + 3; // 3-10 commenti, stabili per questo reel
+    // Shuffle deterministico: stesso reel = stessi commenti sempre
+    var shuffled = _fakeComments.slice().sort(function(a,b){
+      var ha = Math.abs((seed*31 + a[0].charCodeAt(0))|0);
+      var hb = Math.abs((seed*31 + b[0].charCodeAt(0))|0);
+      return ha - hb;
+    }).slice(0,n);
+    shuffled.forEach(function(c){
+      var name=c[0], text=c[1], ver=c[2];
+      var vbadge = ver ? ' <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#20A4F3;font-size:8px;color:#fff;font-weight:700">\u2713</span>' : '';
+      var item = document.createElement('div'); item.className = 'fc-item';
+      item.innerHTML = '<img class="fc-av" src="https://picsum.photos/seed/'+encodeURIComponent(name)+'/36/36" loading="lazy"><div><div class="fc-name">@'+name+vbadge+'</div><div class="fc-text">'+text+'</div></div>';
+      fcList.appendChild(item);
+    });
+    document.getElementById('fk-comments').classList.add('open');
+  }
+
+  function handleTap(x, y) {
+    var el = document.elementFromPoint(x, y);
+    if (!el) return;
+    var sl = curSlide();
+    // Cerca l'azione (sia nelle slide che negli overlay fissi)
+    var act = el.closest ? el.closest('.tk-action') : null;
+    if (act) {
+      var type = act.dataset.type;
+      if (type === 'like') {
+        var liked = act.classList.toggle('liked');
+        var cnt = act.querySelector('.tk-count');
+        if (cnt) { var n=parseFloat(cnt.textContent)||0; cnt.textContent=(liked?n+.1:Math.max(0,n-.1)).toFixed(1)+'K'; }
+        return;
+      }
+      if (type === 'comment') { openComments(); return; }
+      if (type === 'share')   { document.getElementById('fk-share').classList.add('open'); return; }
+      if (type === 'bookmark') { act.classList.toggle('liked'); return; }
+    }
+
+    if (el.closest && (el.closest('.tk-av-wrap') || el.closest('.tk-username'))) {
+      // Leggi dati dall'overlay fisso (non dalla slide che potrebbe non esserci)
+      var uname = '', avSrc = '';
+      var infoEl = el.closest('.tk-info') || el.closest('.tk-sidebar');
+      var prefix = infoEl && infoEl.id ? infoEl.id.replace(/-info|-sidebar/,'') : 'mago';
+      var uEl = document.getElementById(prefix+'-user');
+      var avEl = document.getElementById(prefix+'-av');
+      uname = uEl ? uEl.textContent : '@user';
+      avSrc = avEl ? avEl.src : '';
+      if (!avSrc && sl) avSrc = (sl.querySelector('.slide-img')||{}).src||'';
+      document.getElementById('prof-av').src = avSrc;
+      document.getElementById('prof-name').textContent = uname.trim();
+      // Contatori deterministici dal nome utente (sempre uguali per lo stesso profilo)
+      var usrHash = 0;
+      for (var _c=0; _c<uname.length; _c++) usrHash = ((usrHash<<5)-usrHash+uname.charCodeAt(_c))|0;
+      usrHash = Math.abs(usrHash);
+      document.getElementById('prof-follow-n').textContent = ((usrHash%450)+50).toFixed(0);
+      document.getElementById('prof-followers').textContent = (((usrHash>>3)%8000)+200).toFixed(0);
+      document.getElementById('prof-likes').textContent = ((((usrHash>>7)%9)+1)*0.1).toFixed(1)+'M';
+      _profFollowing = false;
+      var btn = document.getElementById('prof-follow-btn');
+      btn.textContent='Segui'; btn.className='prof-follow out';
+      document.getElementById('fk-profile').classList.add('open');
+      return;
+    }
+
+    if (el.closest && el.closest('.tk-sound')) {
+      if (!sl) return;
+      var sound = (sl.querySelector('.tk-sound-txt')||{}).textContent||'Suono originale';
+      var avS = (sl.querySelector('.tk-disc')||sl.querySelector('.slide-img')||{}).src||'';
+      document.getElementById('music-disc').src = avS;
+      document.getElementById('music-title').textContent = sound;
+      document.getElementById('music-sub').textContent = ((sl.querySelector('.tk-username')||{}).textContent||'').trim()+' \u00b7 '+Math.floor(Math.random()*500+50)+'K video';
+      document.getElementById('fk-music').classList.add('open');
+      return;
+    }
+  }
+
+  // touchend: singolo tap = interazione, doppio tap = cuore
+  container.addEventListener('touchend', function(e) {
+    var t = e.changedTouches[0];
+
+    // Se il dito si è spostato > 25px era uno swipe, non un tap — ignora tutto.
+    // (Lo swiper richiede > 55px per scorrere: la fascia 25-55px è zona neutra.)
+    var travelX = Math.abs(t.clientX - _tapStartX);
+    var travelY = Math.abs(t.clientY - _tapStartY);
+    if (travelY > 25 || travelX > 25) {
+      lastTap = 0;
+      return;
+    }
+
+    var now = Date.now();
+    var isDouble = (now - lastTap) < 300                        // max 300ms tra i due tap
+                && Math.abs(t.clientX - lastTapX) < 40          // stesso punto X (±40px)
+                && Math.abs(t.clientY - lastTapY) < 40;         // stesso punto Y (±40px)
+    lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY;
+
+    if (isDouble) {
+      var el = document.elementFromPoint(t.clientX, t.clientY);
+      var onVideo = el && !el.closest('.tk-action') && !el.closest('.tk-av-wrap')
+                       && !el.closest('.bottom-nav') && !el.closest('.tk-sound')
+                       && !el.closest('.tk-username') && !el.closest('.tk-sidebar');
+      var inSafeZone = t.clientX < (window.innerWidth - 80) || t.clientY < (window.innerHeight - 100);
+      if (onVideo && inSafeZone) container._doHeart();
+      return;
+    }
+    handleTap(t.clientX, t.clientY);
+  }, { passive: true });
+
+  // Fallback per desktop
+  if (!('ontouchstart' in window)) {
+    container.addEventListener('click', function(e) { handleTap(e.clientX, e.clientY); });
+  }
+
+} // chiude initFakeInteractions
+
+// ── BLOCCO ZOOM & SCROLL NATIVO (iOS + Android) ─────────────────────────
+// touchmove document-level rimosso: su iOS 26 causerebbe il browser a
+// considerare la pagina "frozen" → reload forzato
+// Il container del feed gestisce già touchmove con e.preventDefault()
+
+// Zoom prevenuto da:
+// 1. viewport meta user-scalable=no
+// 2. touch-action:none sul feed container
+// NON usiamo document touchstart non-passive: su iOS 26 causa white screen durante scroll
+</script>
+
+<!-- CUORE BURST -->
+<div class="heart-burst" id="heart-burst">
+  <svg viewBox="0 0 100 100" width="100" height="100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 87L12.5 49.5C7.6 44.6 4.9 38.1 4.9 31.2 4.9 17.4 16.3 6 30.1 6c6.8 0 13.3 2.8 18 7.7L50 16l1.9-2.3C56.6 8.8 63.1 6 69.9 6 83.7 6 95.1 17.4 95.1 31.2c0 6.9-2.7 13.4-7.6 18.3L50 87z" fill="#FE2C55"/>
+    <path d="M50 87L12.5 49.5C7.6 44.6 4.9 38.1 4.9 31.2 4.9 17.4 16.3 6 30.1 6c6.8 0 13.3 2.8 18 7.7L50 16l1.9-2.3C56.6 8.8 63.1 6 69.9 6 83.7 6 95.1 17.4 95.1 31.2c0 6.9-2.7 13.4-7.6 18.3L50 87z" fill="url(#hg)" opacity=".35"/>
+    <defs>
+      <radialGradient id="hg" cx="50%" cy="35%" r="55%">
+        <stop offset="0%" stop-color="#fff"/>
+        <stop offset="100%" stop-color="#FE2C55" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+  </svg>
+</div>
+
+<!-- DRAWER COMMENTI -->
+<div class="fake-overlay" id="fk-comments">
+  <div class="fake-overlay-bg" onclick="closeFakeOverlay('fk-comments')"></div>
+  <div class="fake-sheet">
+    <div class="fk-handle"></div><div class="fk-title">Commenti</div>
+    <div id="fc-list"></div>
+    <button class="fk-close" onclick="closeFakeOverlay('fk-comments')">Chiudi</button>
+  </div>
+</div>
+
+<!-- SHARE SHEET -->
+<div class="fake-overlay" id="fk-share">
+  <div class="fake-overlay-bg" onclick="closeFakeOverlay('fk-share')"></div>
+  <div class="fake-sheet">
+    <div class="fk-handle"></div><div class="fk-title">Condividi con</div>
+    <div class="share-row">
+      <div class="share-item"><div class="share-icon" style="background:#25D366">📩</div><div class="share-lbl">WhatsApp</div></div>
+      <div class="share-item"><div class="share-icon" style="background:#0088cc">✈️</div><div class="share-lbl">Telegram</div></div>
+      <div class="share-item"><div class="share-icon" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)">📷</div><div class="share-lbl">Instagram</div></div>
+      <div class="share-item"><div class="share-icon" style="background:#333">🔗</div><div class="share-lbl">Copia link</div></div>
+      <div class="share-item"><div class="share-icon" style="background:#444">⋯</div><div class="share-lbl">Altro</div></div>
+    </div>
+    <button class="fk-close" onclick="closeFakeOverlay('fk-share')">Annulla</button>
+  </div>
+</div>
+
+<!-- PROFILO MINI -->
+<div class="fake-overlay" id="fk-profile">
+  <div class="fake-overlay-bg" onclick="closeFakeOverlay('fk-profile')"></div>
+  <div class="fake-sheet">
+    <div class="fk-handle"></div>
+    <div class="prof-header">
+      <img class="prof-av" id="prof-av" src="" loading="lazy">
+      <div class="prof-name" id="prof-name"></div>
+      <div class="prof-stats">
+        <div class="prof-stat"><span class="prof-stat-n" id="prof-follow-n">0</span><span class="prof-stat-l">Seguiti</span></div>
+        <div class="prof-stat"><span class="prof-stat-n" id="prof-followers">0</span><span class="prof-stat-l">Follower</span></div>
+        <div class="prof-stat"><span class="prof-stat-n" id="prof-likes">0</span><span class="prof-stat-l">Mi piace</span></div>
+      </div>
+    </div>
+    <button class="prof-follow out" id="prof-follow-btn" onclick="toggleFollow()">Segui</button>
+    <button class="fk-close" onclick="closeFakeOverlay('fk-profile')">Chiudi</button>
+  </div>
+</div>
+
+<!-- MUSICA -->
+<div class="fake-overlay" id="fk-music">
+  <div class="fake-overlay-bg" onclick="closeFakeOverlay('fk-music')"></div>
+  <div class="fake-sheet">
+    <div class="fk-handle"></div>
+    <img class="music-disc" id="music-disc" src="">
+    <div class="music-title" id="music-title"></div>
+    <div class="music-sub" id="music-sub"></div>
+    <div class="music-row">
+      <button class="music-btn">♥ Salva</button>
+      <button class="music-btn">➕ Usa suono</button>
+      <button class="music-btn">⋯ Altro</button>
+    </div>
+    <button class="fk-close" style="margin-top:16px" onclick="closeFakeOverlay('fk-music')">Chiudi</button>
+  </div>
+</div>
+
+<!-- DEBUG: mostra errori JS su schermo — da rimuovere dopo debug -->
+<div id="dbg-err" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999999;
+  background:rgba(200,0,0,.95);color:#fff;padding:12px;font-size:13px;font-family:monospace;
+  max-height:40vh;overflow-y:auto;word-break:break-all;"></div>
+<script>
+// ── DEBUG: cattura errori JS e li mostra su schermo ─────────────────────
+window.onerror = function(msg, src, line, col, err) {
+  var el = document.getElementById('dbg-err');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML += '<b>[JS ERROR]</b> ' + msg + '<br><small>' + src + ':' + line + '</small><br><br>';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var el = document.getElementById('dbg-err');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML += '<b>[PROMISE]</b> ' + (e.reason||'') + '<br><br>';
+});
+</script>
+
+<!-- DIAGNOSTICA: triple-tap angolo alto destra per attivare -->
+<div id="diag-panel" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999999;
+  background:rgba(0,0,0,.88);color:#0f0;font-family:monospace;font-size:12px;
+  padding:10px 12px;line-height:1.7;pointer-events:none;"></div>
+<script>
+// ── DIAGNOSTICA ALTEZZE (triple-tap angolo alto destra) ─────────────────────
+(function() {
+  var _diagTaps = 0, _diagT = 0;
+  var _diagActive = false;
+  var _diagInterval = null;
+
+  document.addEventListener('touchend', function(e) {
+    var t = e.changedTouches[0];
+    // Zona: angolo alto destra (80px × 80px)
+    if (t.clientX < window.innerWidth - 80 || t.clientY > 80) {
+      _diagTaps = 0; return;
+    }
+    var now = Date.now();
+    if (now - _diagT > 800) _diagTaps = 0;
+    _diagT = now;
+    _diagTaps++;
+    if (_diagTaps >= 3) {
+      _diagTaps = 0;
+      _diagActive = !_diagActive;
+      var dp = document.getElementById('diag-panel');
+      if (!dp) return;
+      if (_diagActive) {
+        dp.style.display = 'block';
+        _diagInterval = setInterval(function() {
+          var slides = document.querySelector('.slides-wrapper');
+          var slide  = document.querySelector('.video-slide');
+          var magoC  = document.getElementById('mago-container');
+          var spettC = document.getElementById('spett-container');
+          var activeC = magoC && magoC.closest('.view.active') ? magoC : spettC;
+          dp.innerHTML =
+            '<b>── DIAGNOSTICA ALTEZZE ──</b><br>' +
+            'window.innerHeight:    <b>' + window.innerHeight + '</b><br>' +
+            'window._SLIDE_H:       <b>' + window._SLIDE_H + '</b><br>' +
+            'slide.offsetHeight:    <b>' + (slide ? slide.offsetHeight : 'N/A') + '</b><br>' +
+            'container.clientH:     <b>' + (activeC ? activeC.clientHeight : 'N/A') + '</b><br>' +
+            'scrollTop:            <b>' + (slides ? slides.scrollTop : 'N/A') + '</b><br>' +
+            'screen: ' + screen.width + 'x' + screen.height + ' ratio:' + devicePixelRatio + '<br>' +
+            '100dvh CSS: <b>' + getComputedStyle(document.documentElement).getPropertyValue('--slide-h') + '</b><br>' +
+            '<small>triple-tap angolo alto-destra per chiudere</small>';
+        }, 300);
+      } else {
+        dp.style.display = 'none';
+        if (_diagInterval) clearInterval(_diagInterval);
+      }
+    }
+  }, { passive: true });
+
+})();
+
+// ══════════════════════════════════════════════════════════════════════
+// ROUTING FINALE — eseguito per ultimo, dopo che OGNI funzione di OGNI
+// blocco <script> è stata definita (initFakeInteractions, __splashGo, ecc.)
+// Esecuzione sincrona immediata: niente eventi, robusto su iOS Safari.
+// ══════════════════════════════════════════════════════════════════════
+(function _runRouting() {
+  var _p = new URLSearchParams(location.search);
+  var _m = (_p.get('m') || '').toUpperCase().trim();
+  var _s = (_p.get('s') || '').toUpperCase().trim();
+
+  if (_m.length === 4) {
+    initMagoFeed(_m, codeToTopic(_m));
+    setTimeout(function() { if (!__splashDone) __splashGo(); }, 200);
+  } else if (_s.length === 4) {
+    initSpettFeed(_s);
+    setTimeout(function() { if (!__splashDone) __splashGo(); }, 200);
+  } else {
+    showView('view-home');
+    initMagoHome();
+  }
+})();
+</script>
+
+</div>
+</body>
+</html>
