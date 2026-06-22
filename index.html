@@ -9,7 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="UnReel">
 <title>UnReel</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  #feed-container { touch-action:pan-y; }   /* solo scroll verticale, niente zoom */
   :root {
     --like:#FE2C55; --bg:#000; --fg:#fff;
     --panel:#161823; --muted:rgba(255,255,255,.65);
@@ -237,7 +238,7 @@
   }
   #mago-dot.blinking { animation:blink 1s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
-  .secret-zone { position:absolute; z-index:30; width:74px; height:74px; }
+  .secret-zone { position:absolute; z-index:40; width:96px; height:96px; }
   #secret-zone { top:0; right:0; }
   #home-zone { top:0; left:0; }
 
@@ -862,8 +863,11 @@ function mountFeed(videos, onArrive){
   slidesEl.innerHTML = '';
   container.scrollTop = 0;
   for (var i=0;i<videos.length;i++) slidesEl.appendChild(createSlide(videos[i]));
-  fitSlides();                              // altezza reel = altezza schermo
-  requestAnimationFrame(fitSlides);         // ancora dopo il primo render
+  fitSlides();
+  requestAnimationFrame(fitSlides);
+  setTimeout(fitSlides, 150);
+  setTimeout(fitSlides, 500);
+  setTimeout(fitSlides, 1200);
 
   var curIdx = -1, vidTimer = null;
 
@@ -871,6 +875,7 @@ function mountFeed(videos, onArrive){
     if (idx === curIdx) return;
     curIdx = idx;
     _activeSlide = slidesEl.children[idx] || null;
+    if (_activeSlide && _activeSlide.offsetHeight < 100) fitSlides();
     updateOverlay(idx);                 // testo: immediato e leggero
     if (onArrive) onArrive(idx);
     // video: con piccolo ritardo, così durante lo scroll veloce non si
@@ -965,17 +970,34 @@ function isOverlayTarget(t){
 }
 function bindFeedTaps(){
   var c = $('feed-container');
-  c.addEventListener('click', function(e){
-    if (isOverlayTarget(e.target)) return;
+  function handleTap(target){
+    if (isOverlayTarget(target)) return;
     var now = Date.now();
-    if (now - _lastTap < 300){
+    if (now - _lastTap < 300){           // doppio tap → like
       clearTimeout(_tapTimer); _lastTap = 0;
       doLike();
-    } else {
+    } else {                              // tap singolo → pausa (dopo 300ms)
       _lastTap = now;
       _tapTimer = setTimeout(function(){ togglePause(); }, 300);
     }
-  });
+  }
+  var touch = ('ontouchstart' in window || navigator.maxTouchPoints>0);
+  if (touch){
+    var sx=0, sy=0, moved=false;
+    c.addEventListener('touchstart', function(e){
+      var t=e.touches[0]; if(t){ sx=t.clientX; sy=t.clientY; } moved=false;
+    }, { passive:true });
+    c.addEventListener('touchmove', function(e){
+      var t=e.touches[0];
+      if (t && (Math.abs(t.clientX-sx)>16 || Math.abs(t.clientY-sy)>16)) moved=true;
+    }, { passive:true });
+    c.addEventListener('touchend', function(e){
+      if (moved) return;                  // era uno scroll, non un tap
+      handleTap(e.target);
+    }, { passive:true });
+  } else {
+    c.addEventListener('click', function(e){ handleTap(e.target); });
+  }
 }
 
 /* ───────── PANNELLI FAKE (commenti, profilo, musica, condividi) ───────── */
@@ -1062,14 +1084,28 @@ function bindSidebar(){
 function bindSecret(elId, cb){
   var el = $(elId); if (!el) return;
   var count=0, timer=null, sx=0, sy=0, moved=false;
-  var touch = ('ontouchstart' in window || navigator.maxTouchPoints>0);
-  if (touch){
-    el.ontouchstart = function(e){ sx=e.touches[0].clientX; sy=e.touches[0].clientY; moved=false; };
-    el.ontouchmove  = function(e){ if (Math.abs(e.touches[0].clientX-sx)>12 || Math.abs(e.touches[0].clientY-sy)>12) moved=true; };
-    el.ontouchend   = function(){ if(moved){count=0;return;} count++; clearTimeout(timer); timer=setTimeout(function(){count=0;},600); if(count>=3){count=0;cb();} };
-  } else {
-    el.onclick = function(){ count++; clearTimeout(timer); timer=setTimeout(function(){count=0;},600); if(count>=3){count=0;cb();} };
+  function tap(){
+    count++;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ count=0; }, 800);   // finestra ampia: 3 tap
+    if (count>=3){ count=0; cb(); }
   }
+  // TOUCH (iPhone/Android)
+  el.addEventListener('touchstart', function(e){
+    var t = e.touches[0] || e.changedTouches[0];
+    if (t){ sx=t.clientX; sy=t.clientY; } moved=false;
+  }, { passive:true });
+  el.addEventListener('touchmove', function(e){
+    var t = e.touches[0] || e.changedTouches[0];
+    if (t && (Math.abs(t.clientX-sx)>16 || Math.abs(t.clientY-sy)>16)) moved=true;
+  }, { passive:true });
+  el.addEventListener('touchend', function(e){
+    e.preventDefault();              // niente click-fantasma né zoom
+    if (moved){ count=0; return; }
+    tap();
+  }, { passive:false });
+  // MOUSE (desktop)
+  el.addEventListener('click', function(){ tap(); });
 }
 
 /* ───────── SPIA CONNESSIONE (condivisa code-screen + pannello) ───────── */
@@ -1207,6 +1243,7 @@ var _splashDone=false;
 function splashGo(){
   if(_splashDone)return; _splashDone=true;
   var sp=$('splash'); if(sp) sp.classList.add('hide');
+  fitSlides(); setTimeout(fitSlides, 200);
   // la dismissione (spesso un tap) sblocca l'autoplay su iOS: riavvia il 1° video
   if (_activeSlide){
     var v = _activeSlide.querySelector('.slide-vid');
@@ -1218,7 +1255,8 @@ function initApp(){
   bindFeedTaps();
   bindSidebar();
   window.addEventListener('resize', fitSlides);
-  window.addEventListener('orientationchange', function(){ setTimeout(fitSlides, 300); });
+  window.addEventListener('orientationchange', function(){ setTimeout(fitSlides, 200); setTimeout(fitSlides, 600); });
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) setTimeout(fitSlides, 100); });
 
   var sp=$('splash');
   if (sp){ sp.addEventListener('click', splashGo); sp.addEventListener('touchend', splashGo); }
