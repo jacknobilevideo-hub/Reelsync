@@ -387,7 +387,7 @@
         <svg viewBox="0 0 24 24" fill="#fff"><path d="M14 8.5V5.2c0-.7.8-1 1.3-.6l6.1 5.3c.4.3.4.9 0 1.2l-6.1 5.3c-.5.4-1.3.1-1.3-.6v-3.2c-4 0-7.5 1.3-10 4.5.5-6 4-9.5 10-10.4z"/></svg>
         <span class="n" id="ov-shares">0</span>
       </div>
-      <div class="side-av-wrap" style="margin-top:4px">
+      <div class="side-av-wrap" id="disc-btn" style="margin-top:4px; padding:11px; cursor:pointer">
         <svg viewBox="0 0 24 24" width="33" height="33" fill="#fff" style="animation:spin 4s linear infinite"><circle cx="12" cy="12" r="10" fill="#222"/><circle cx="12" cy="12" r="3.2" fill="#fff"/></svg>
       </div>
     </div>
@@ -410,7 +410,6 @@
     <div id="heart-burst"><svg viewBox="0 0 24 24" width="110" height="110"><path fill="#FE2C55" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
 
     <div id="mago-dot"></div>
-    <div class="secret-zone" id="secret-zone"></div>
     <div class="secret-zone" id="home-zone"></div>
   </div>
 
@@ -499,8 +498,16 @@ var CONFIG = {
   // raggiungibili. Oppure incolla URL completi di un servizio (es. Pexels).
   videosEnabled: true,
   videoUrls: [
-    'bg1.mp4', 'bg2.mp4', 'bg3.mp4', 'bg4.mp4',
-    'bg5.mp4', 'bg6.mp4', 'bg7.mp4', 'bg8.mp4'
+    'bg1.mp4', 'bg2.mp4', 'bg3.mp4', 'bg4.mp4', 'bg5.mp4',
+    'bg6.mp4', 'bg7.mp4', 'bg8.mp4', 'bg9.mp4', 'bg10.mp4',
+    'bg11.mp4', 'bg12.mp4', 'bg13.mp4', 'bg14.mp4', 'bg15.mp4',
+    'bg16.mp4', 'bg17.mp4', 'bg18.mp4', 'bg19.mp4', 'bg20.mp4',
+    'bg21.mp4', 'bg22.mp4', 'bg23.mp4', 'bg24.mp4', 'bg25.mp4',
+    'bg26.mp4', 'bg27.mp4', 'bg28.mp4', 'bg29.mp4', 'bg30.mp4',
+    'bg31.mp4', 'bg32.mp4', 'bg33.mp4', 'bg34.mp4', 'bg35.mp4',
+    'bg36.mp4', 'bg37.mp4', 'bg38.mp4', 'bg39.mp4', 'bg40.mp4',
+    'bg41.mp4', 'bg42.mp4', 'bg43.mp4', 'bg44.mp4', 'bg45.mp4',
+    'bg46.mp4', 'bg47.mp4', 'bg48.mp4', 'bg49.mp4', 'bg50.mp4'
   ],
 
   // ── TEMPI (millisecondi) ───────────────────────────────────────────
@@ -518,6 +525,12 @@ var CONFIG = {
 var GITHUB_URL  = CONFIG.github;
 var NTFY_PREFIX = CONFIG.ntfyPrefix;
 var VIDEO_POOL  = CONFIG.videoUrls;
+// Tre gruppi di sfondi SEPARATI: così mago e spettatore, scorrendo i loro reel
+// diversi, non possono MAI vedere lo stesso sfondo per caso. Solo i reel della
+// coincidenza (condivisi) usano il gruppo COND → stesso sfondo per entrambi.
+var VIDEO_POOL_MAGO  = VIDEO_POOL.slice(0, 20);    // bg1-20  : caldi  + numeri 1-20
+var VIDEO_POOL_SPETT = VIDEO_POOL.slice(20, 40);   // bg21-40 : freddi + numeri 21-40
+var VIDEO_POOL_COND  = VIDEO_POOL.slice(40, 50);   // bg41-50 : magenta + numeri 41-50 (coincidenza)
 
 /* ───────── POOL CONTENUTI (username, descrizioni, suoni, colori) ───────── */
 const MAGO_POOL = [
@@ -772,7 +785,11 @@ function createSlide(v){
   var s = document.createElement('div');
   s.className = 'video-slide';
   var h = vidHash(v);
-  var vidUrl = VIDEO_POOL[h % VIDEO_POOL.length];
+  // Sceglie il gruppo di sfondi giusto: mago / spettatore / coincidenza.
+  var pool = (v._vp==='S') ? VIDEO_POOL_SPETT
+           : (v._vp==='C') ? VIDEO_POOL_COND
+           : VIDEO_POOL_MAGO;
+  var vidUrl = pool[h % pool.length];
   // dati per overlay
   s.dataset.user=v.user; s.dataset.desc=v.desc; s.dataset.tags=v.tags;
   s.dataset.sound=v.sound; s.dataset.likes=v.likes; s.dataset.comments=v.comments;
@@ -966,7 +983,7 @@ function doLike(){
 /* ───────── TAP SUL REEL: single = pausa, double = like ───────── */
 var _lastTap = 0, _tapTimer = null;
 function isOverlayTarget(t){
-  return !!(t.closest && t.closest('#sidebar, #top-icons, #bottom-nav, #info .sound, .secret-zone, #control-panel, .fk'));
+  return !!(t.closest && t.closest('#sidebar, #top-icons, #bottom-nav, #info .sound, .secret-zone, #disc-btn, #control-panel, .fk'));
 }
 function bindFeedTaps(){
   var c = $('feed-container');
@@ -1153,6 +1170,8 @@ function initMagoFeed(code){
   var mVids = seededShuffle(MAGO_POOL, magoSeed(code)).slice(0, CONFIG.feedMagoUnique);
   var cBase = seededShuffle(CONDIVISI_POOL, condivisiSeed(code));
   var cVids = cBase.concat(cBase).slice(0, CONFIG.feedShared);
+  mVids.forEach(function(v){ v._vp='M'; });   // reel del mago → sfondi caldi
+  cVids.forEach(function(v){ v._vp='C'; });   // reel condivisi → sfondi coincidenza
   var videos = mVids.slice(); for (var i=0;i<CONFIG.feedMixIn;i++) videos.push(cVids[i]);
 
   var armed=false, selectedNum=null, coincIdx=null, flashed=false, idleTimer=null;
@@ -1202,7 +1221,7 @@ function initMagoFeed(code){
 
   function openPanel(){ $('control-panel').classList.add('open'); }
   function closePanel(){ $('control-panel').classList.remove('open'); }
-  bindSecret('secret-zone', openPanel);
+  bindSecret('disc-btn', openPanel);
   bindSecret('home-zone', function(){ location.href = location.pathname; });
   $('panel-bg').onclick = closePanel;
   $('close-btn').onclick = closePanel;
@@ -1219,6 +1238,8 @@ function initSpettFeed(code){
   var sVids = seededShuffle(SPETT_POOL, spettSeed(code)).slice(0, CONFIG.feedSpettUnique);
   var cBase = seededShuffle(CONDIVISI_POOL, condivisiSeed(code));
   var cVids = cBase.concat(cBase).slice(0, CONFIG.feedShared);
+  sVids.forEach(function(v){ v._vp='S'; });   // reel spettatore → sfondi freddi
+  cVids.forEach(function(v){ v._vp='C'; });   // reel condivisi → sfondi coincidenza
   var videos = sVids.slice(); for (var i=0;i<CONFIG.feedMixIn;i++) videos.push(cVids[i]);
 
   var feed = mountFeed(videos, function(){});
@@ -1251,9 +1272,43 @@ function splashGo(){
   }
 }
 
+function goFullscreen(){
+  // Android Chrome: schermo intero vero. iPhone non lo supporta (usa viewport-fit).
+  var el = document.documentElement;
+  var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  if (req){ try { req.call(el); } catch(e){} }
+}
+
 function initApp(){
   bindFeedTaps();
   bindSidebar();
+
+  // ── Blocco del doppio-tap zoom su iPhone (vale per mago E spettatore) ──
+  // touch-action da solo a volte non basta su iOS: qui annullo esplicitamente
+  // il secondo tocco ravvicinato, che è ciò che fa partire lo zoom.
+  var _lastTE = 0;
+  document.addEventListener('touchend', function(e){
+    var now = Date.now();
+    if (now - _lastTE <= 350){ e.preventDefault(); }
+    _lastTE = now;
+  }, { passive:false });
+  // Annullo anche il gesto di pinch-zoom a due dita.
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+
+  // ── Fullscreen su Android al primo tocco dell'utente ──
+  var _fsArmed = true;
+  function armFullscreen(){
+    if (!_fsArmed) return; _fsArmed = false;
+    goFullscreen();
+    setTimeout(fitSlides, 300); setTimeout(fitSlides, 800);
+  }
+  document.addEventListener('touchend', armFullscreen);
+  document.addEventListener('click', armFullscreen);
+  // Quando entra/esce dal fullscreen, l'altezza cambia → ricalcolo i reel.
+  document.addEventListener('fullscreenchange', function(){ setTimeout(fitSlides,150); setTimeout(fitSlides,500); });
+  document.addEventListener('webkitfullscreenchange', function(){ setTimeout(fitSlides,150); setTimeout(fitSlides,500); });
+
   window.addEventListener('resize', fitSlides);
   window.addEventListener('orientationchange', function(){ setTimeout(fitSlides, 200); setTimeout(fitSlides, 600); });
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) setTimeout(fitSlides, 100); });
