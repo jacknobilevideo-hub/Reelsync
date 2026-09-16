@@ -6,8 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="UnReel">
-<title>UnReel</title>
+<meta name="apple-mobile-web-app-title" content="Shorts">
+<title>Shorts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   #feed-container { touch-action:pan-y; }   /* solo scroll verticale, niente zoom */
@@ -17,7 +20,7 @@
   }
   html, body {
     width:100%; height:100%; background:#000; color:var(--fg);
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    font-family:Roboto,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     overflow:hidden; overscroll-behavior:none;
     -webkit-font-smoothing:antialiased; user-select:none; -webkit-user-select:none;
   }
@@ -44,9 +47,12 @@
   #splash {
     position:absolute; inset:0; z-index:200;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 50% 38%, #1a0a2e 0%, #08080f 70%);
-    transition:opacity .5s ease;
+    background:#0f0f0f;
+    transition:opacity .35s ease;
   }
+  .splash-yt { display:flex; align-items:center; gap:10px; font-size:26px; font-weight:600; color:#fff; letter-spacing:-.3px; }
+  .splash-spin { margin-top:34px; width:26px; height:26px; border-radius:50%;
+    border:2.5px solid rgba(255,255,255,.18); border-top-color:#fff; animation:spin 1s linear infinite; }
   #splash.hide { opacity:0; pointer-events:none; }
   .splash-orb {
     position:absolute; width:280px; height:280px; border-radius:50%;
@@ -231,12 +237,6 @@
   }
 
   /* ====== MAGO: spia + zone segrete ====== */
-  #mago-dot {
-    position:absolute; top:13px; left:13px; z-index:20;
-    width:11px; height:11px; border-radius:50%; background:#fff;
-    box-shadow:0 0 8px rgba(255,255,255,.8); display:none;
-  }
-  #mago-dot.blinking { animation:blink 1s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
   .secret-zone { position:absolute; z-index:40; width:96px; height:96px; }
   #secret-zone { top:0; right:0; }
@@ -319,10 +319,12 @@
 
   <!-- ===== SPLASH ===== -->
   <div id="splash">
-    <div class="splash-orb"></div>
-    <div class="splash-logo">Un<span class="r">Reel</span></div>
-    <div class="splash-tag">real or unreal?</div>
-    <div class="splash-play"><svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+    <div class="splash-yt">
+      <svg viewBox="0 0 24 24" width="44" height="44"><rect x="3" y="4" width="18" height="16" rx="5.5" fill="#FF0000"/><path d="M10 8.6l6 3.4-6 3.4z" fill="#fff"/></svg>
+      <span>Shorts</span>
+    </div>
+    <div class="splash-spin"></div>
+    <div class="splash-hint">Se questa schermata non sparisce, apri l'app dal link e non dal file.</div>
   </div>
 
   <!-- ===== HOME (mago) ===== -->
@@ -350,7 +352,7 @@
         <span class="conn-dot" id="code-dot"></span>
         <span id="code-status">In attesa dello spettatore…</span>
       </div>
-      <div style="margin-top:22px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;">build · STACCO</div>
+      <div style="margin-top:22px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;">build · VIDEO</div>
     </div>
   </div>
 
@@ -360,57 +362,65 @@
 
     <!-- Overlay fissi -->
     <div id="top-bar" class="overlay">
-      <span class="tab">Seguiti</span>
-      <span class="tab on">Per te</span>
+      <span class="yt-brand">
+        <svg viewBox="0 0 24 24" width="21" height="21"><rect x="3" y="4" width="18" height="16" rx="5.5" fill="#FF0000"/><path id="mago-dot" d="M10 8.6l6 3.4-6 3.4z" fill="#fff"/></svg>
+        Shorts
+      </span>
     </div>
     <div id="top-icons">
       <svg class="top-ic" viewBox="0 0 24 24" fill="#fff"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      <svg class="top-ic" viewBox="0 0 24 24" fill="#fff"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      <svg class="top-ic" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
     </div>
 
     <div id="sidebar" class="overlay">
-      <div class="side-av-wrap" id="av-btn">
-        <div class="side-av" id="ov-av">A</div>
-        <div class="side-av-plus">+</div>
-      </div>
       <div class="side-btn" id="like-btn" data-type="like">
-        <svg class="heart-ic" viewBox="0 0 24 24"><path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <svg class="heart-ic" viewBox="0 0 24 24"><path class="o" fill="#fff" d="M9 21h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.58 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2zM9 9l4.34-4.34L12 10h9v2l-3 7H9V9zM1 9h4v12H1z"/><path class="f" fill="#fff" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
         <span class="n" id="ov-likes">0</span>
       </div>
+      <div class="side-btn" id="bookmark-btn" data-type="bookmark">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm0 12l-4.34 4.34L12 14H3v-2l3-7h9v10zm4-12h4v12h-4z"/></svg>
+        <span class="n lbl" id="ov-saves">Non mi piace</span>
+      </div>
       <div class="side-btn" id="comment-btn" data-type="comment">
-        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3C6.5 3 2 6.58 2 11c0 2.1 1.02 4 2.71 5.42-.13 1.2-.62 2.5-1.5 3.58 1.7-.27 3.2-.9 4.4-1.74C9.1 18.74 10.5 19 12 19c5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
         <span class="n" id="ov-comments">0</span>
       </div>
-      <div class="side-btn" id="bookmark-btn" data-type="bookmark">
-        <svg viewBox="0 0 24 24" fill="#fff"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
-        <span class="n" id="ov-saves">0</span>
-      </div>
       <div class="side-btn" id="share-btn" data-type="share">
-        <svg viewBox="0 0 24 24" fill="#fff"><path d="M14 8.5V5.2c0-.7.8-1 1.3-.6l6.1 5.3c.4.3.4.9 0 1.2l-6.1 5.3c-.5.4-1.3.1-1.3-.6v-3.2c-4 0-7.5 1.3-10 4.5.5-6 4-9.5 10-10.4z"/></svg>
-        <span class="n" id="ov-shares">0</span>
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
+        <span class="n lbl" id="ov-shares">Condividi</span>
       </div>
-      <div class="side-av-wrap" id="disc-btn" style="margin-top:4px; padding:11px; cursor:pointer">
-        <svg viewBox="0 0 24 24" width="33" height="33" fill="#fff" style="animation:spin 4s linear infinite"><circle cx="12" cy="12" r="10" fill="#222"/><circle cx="12" cy="12" r="3.2" fill="#fff"/></svg>
+      <div class="side-btn" id="more-btn">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+        <span class="n lbl">Remix</span>
+      </div>
+      <div class="yt-sound" id="disc-btn" style="cursor:pointer">
+        <div class="yt-sound-box" id="ov-soundbox">A</div>
       </div>
     </div>
 
     <div id="info" class="overlay">
-      <div class="user" id="ov-user">@username</div>
+      <div class="yt-chan" id="av-btn">
+        <div class="yt-av" id="ov-av">A</div>
+        <span class="user" id="ov-user">@username</span>
+        <span class="yt-sub">Iscriviti</span>
+      </div>
       <div class="desc" id="ov-desc"></div>
-      <div class="tags" id="ov-tags"></div>
+      <div class="sound"><svg class="mus" viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg><span id="ov-tags"></span></div>
     </div>
 
     <div id="bottom-nav" class="overlay">
-      <div class="nav-it on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>Scopri</div>
+      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+      <div class="nav-it on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 7.2l-2.6-1.5c-1.9-1.1-4.3-.4-5.4 1.5l-3.6 6.2c-1.1 1.9-.4 4.3 1.5 5.4l2.6 1.5c1.9 1.1 4.3.4 5.4-1.5l3.6-6.2c1.1-1.9.4-4.3-1.5-5.4zM10.5 15.5v-6l5 3-5 3z"/></svg>Shorts</div>
       <div class="nav-plus"><span>+</span></div>
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Inbox</div>
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>Profilo</div>
+      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 18v-6l5 3-5 3zm9-15H5v2h14V3zm2 4H3v2h18V7zm1 15H2V11h20v11z"/></svg>Iscrizioni</div>
+      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>Tu</div>
     </div>
 
+    <div id="yt-progress"><div id="yt-progress-fill"></div></div>
     <div id="pause-icon"><svg viewBox="0 0 24 24" width="40" height="40" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
-    <div id="heart-burst"><svg viewBox="0 0 24 24" width="110" height="110"><path fill="#FE2C55" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+    <div id="heart-burst"><svg viewBox="0 0 24 24" width="100" height="100"><path fill="#fff" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg></div>
 
-    <div id="mago-dot"></div>
     <div class="secret-zone" id="home-zone"></div>
   </div>
 
@@ -466,7 +476,79 @@
 
 </div>
 
-<style>@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>
+<style>@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  /* ═══ Aspetto YouTube Shorts ═══ */
+  #top-bar { justify-content:flex-start; padding-left:14px; gap:8px;
+    background:linear-gradient(to bottom, rgba(0,0,0,.45), transparent); }
+  .yt-brand { display:flex; align-items:center; gap:7px; font-size:17px; font-weight:600; color:#fff;
+    text-shadow:0 1px 4px rgba(0,0,0,.5); }
+  #top-icons { top:15px; gap:18px; }
+
+  #sidebar { bottom:92px; gap:17px; }
+  .side-btn .n { font-size:11.5px; font-weight:500; }
+  .side-btn .lbl { font-size:9.5px; white-space:nowrap; }
+  #sidebar .side-btn.liked .heart-ic path { fill:#3ea6ff; }
+  .yt-sound { margin-top:4px; padding:9px; cursor:pointer; }
+  .yt-sound-box { width:34px; height:34px; border-radius:6px;
+    background:linear-gradient(135deg,#3a3a3a,#111); border:1px solid rgba(255,255,255,.35);
+    display:flex; align-items:center; justify-content:center; }
+
+  #info { left:12px; right:72px; bottom:72px; }
+  .yt-chan { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .yt-av { width:30px; height:30px; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#fff; }
+  #info .user { font-size:14px; font-weight:600; margin-bottom:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .yt-sub { background:#fff; color:#0f0f0f; border-radius:16px; padding:5px 12px;
+    font-size:12.5px; font-weight:600; flex:0 0 auto; }
+  #info .desc { font-size:14px; font-weight:400; margin-bottom:9px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #info .sound { display:flex; align-items:center; gap:6px; font-size:12.5px; }
+  #info .sound .mus { width:15px; height:15px; flex:0 0 auto; }
+
+  .nav-plus { width:36px; height:36px; border-radius:50%;
+    background:#272727; box-shadow:none; }
+  .nav-plus span { font-size:21px; color:#fff; font-weight:400; }
+  .nav-it { font-size:9.5px; }
+
+  /* ═══ Safe area iPhone (schermo intero / Aggiungi a Home) ═══ */
+  #top-bar   { padding-top:calc(8px + env(safe-area-inset-top)); height:calc(54px + env(safe-area-inset-top)); }
+  #top-icons { top:calc(15px + env(safe-area-inset-top)); }
+  #bottom-nav{ height:calc(50px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); box-sizing:border-box; }
+  #sidebar   { bottom:calc(92px + env(safe-area-inset-bottom)); }
+  #info      { bottom:calc(72px + env(safe-area-inset-bottom)); }
+  /* icone a contorno che si riempiono al mi piace (come YouTube) */
+  #sidebar .heart-ic .f { display:none; }
+  #sidebar .side-btn.liked .heart-ic .o { display:none; }
+  #sidebar .side-btn.liked .heart-ic .f { display:block; }
+  #sidebar .side-btn.liked .heart-ic path { fill:#fff; }
+
+  /* Il blocco canale/titolo è decorativo: i tocchi passano al feed sotto
+     (serve alla riga dello 0 del tastierino, che sta proprio lì). */
+  #info { pointer-events:none; }
+
+  /* Spia segreta del mago: è il triangolino bianco dentro il logo in alto a
+     sinistra. Normale = niente; lampeggia = armato (conto alla rovescia);
+     attenuato fisso = coincidenza pronta. Nessun elemento aggiunto. */
+  #mago-dot.spy-blink { animation:spyblink 1s ease-in-out infinite; }
+  #mago-dot.spy-ready { opacity:.4; }
+  @keyframes spyblink { 0%,100%{opacity:1} 50%{opacity:.06} }
+
+  /* Barra di avanzamento rossa in fondo al video, come su Shorts */
+  #yt-progress { position:absolute; left:0; right:0; bottom:calc(50px + env(safe-area-inset-bottom));
+    height:2px; background:rgba(255,255,255,.28); z-index:12; pointer-events:none; }
+  #yt-progress-fill { height:100%; width:0%; background:#FF0000; }
+  /* Riquadro audio = avatar del canale (come su Shorts) */
+  .yt-sound-box { font-size:12px; font-weight:700; color:#fff; }
+
+  /* Compare dopo 5s SOLO se il JavaScript non è in esecuzione (es. file aperto
+     con l'anteprima di iOS): con il JavaScript attivo la schermata sparisce prima. */
+  .splash-hint { position:absolute; bottom:calc(40px + env(safe-area-inset-bottom)); left:24px; right:24px;
+    text-align:center; color:#8a8a8a; font-size:12px; line-height:1.4; opacity:0;
+    animation:hintIn .4s ease 5s forwards; }
+  @keyframes hintIn { to { opacity:1; } }
+</style>
 <script>
 /* ════════════════════════════════════════════════════════════════════
    UnReel — app di mentalismo digitale
@@ -522,13 +604,25 @@ var CONFIG = {
   feedMagoUnique:  60,  // reel unici nel feed del mago
   feedSpettUnique: 52,  // reel unici nel feed dello spettatore
   feedShared:      45,  // reel condivisi (la riserva per la coincidenza)
-  feedMixIn:       15   // quanti condivisi mischiati già all'inizio
+  feedMixIn:       15,  // quanti condivisi mischiati già all'inizio
+
+  // ── Tastierino a tocco (solo mago) ──
+  // Reel su cui si imposta il numero toccando lo schermo: il primo per le
+  // decine, il secondo per le unità (1 = primo reel del feed).
+  keypadReels:  [5, 6],
+  // Video da mostrare su quei due reel (finché non esistono, resta il video normale).
+  keypadVideos: ['video/tastierino_decine.mp4', 'video/tastierino_unita.mp4'],
+  keypadMax:    99,     // numero massimo impostabile (tastierino e pannello)
+  // Confini delle righe, in frazione dell'altezza dello schermo: sopra il primo
+  // il tocco è ignorato; poi riga 1-2-3 (tre colonne); infine la riga dello 0.
+  keypadRows:   [0.08, 0.36, 0.57, 0.78]
 };
 
 // Costanti derivate (per comodità interna — non modificare).
 var GITHUB_URL  = CONFIG.github;
 var NTFY_PREFIX = CONFIG.ntfyPrefix;
 var NTFY_BASE   = CONFIG.ntfyBase;
+var _kpTap = null;   // gancio del tastierino a tocco: lo imposta solo il feed del mago
 var VIDEO_POOL  = CONFIG.videoUrls;
 // Tre gruppi di sfondi SEPARATI: così mago e spettatore, scorrendo i loro reel
 // diversi, non possono MAI vedere lo stesso sfondo per caso. Solo i reel della
@@ -841,7 +935,9 @@ function createSlide(v){
   var pool = (v._vp==='S') ? VIDEO_POOL_SPETT
            : (v._vp==='C') ? VIDEO_POOL_COND
            : VIDEO_POOL_MAGO;
-  var vidUrl = pool[h % pool.length];
+  // Reel condivisi: clip a rotazione in base alla posizione (uguale sui due
+  // telefoni), così due reel condivisi vicini non mostrano mai la stessa clip.
+  var vidUrl = (v._vp==='C' && v._ci!==undefined) ? pool[v._ci % pool.length] : pool[h % pool.length];
   // dati per overlay
   s.dataset.user=v.user; s.dataset.desc=v.desc; s.dataset.tags=v.tags;
   s.dataset.sound=v.sound; s.dataset.likes=v.likes; s.dataset.comments=v.comments;
@@ -851,6 +947,10 @@ function createSlide(v){
   // on-demand solo per il reel attivo (iPhone limita gli elementi video totali,
   // averne 1 alla volta evita i crash/refresh). L'url è salvato nel dataset.
   s.dataset.vidurl = vidUrl;
+  // Reel del tastierino: ha un video dedicato (se il file esiste)
+  if (v._kp!==undefined && CONFIG.keypadVideos && CONFIG.keypadVideos[v._kp]){
+    s.dataset.kp = v._kp; s.dataset.kpurl = CONFIG.keypadVideos[v._kp];
+  }
   s.innerHTML =
     '<div class="slide-grad" style="--c1:'+v.c1+';--c2:'+v.c2+'"></div>' +
     '<div class="slide-vignette"></div>';
@@ -858,20 +958,29 @@ function createSlide(v){
 }
 
 /* aggiorna gli overlay fissi coi dati della slide attiva */
+function ytNum(s){
+  // YouTube non mostra il decimale sopra le centinaia di migliaia: 234.5K → 235K
+  var m = /^(\d{3})\.(\d)([KM])$/.exec(s||'');
+  if (m) return (parseInt(m[1],10) + (parseInt(m[2],10)>=5?1:0)) + m[3];
+  return s;
+}
 function updateOverlay(idx){
   var slide = $('slides').children[idx];
   if (!slide) return;
   var d = slide.dataset;
   $('ov-user').textContent     = '@'+d.user;
   $('ov-desc').textContent     = d.desc;
-  $('ov-tags').textContent     = d.tags;
-  $('ov-likes').textContent    = d.likes;
-  $('ov-comments').textContent = d.comments;
-  $('ov-shares').textContent   = d.shares;
-  $('ov-saves').textContent    = d.saves;
+  $('ov-tags').textContent     = d.sound;
+  $('ov-likes').textContent    = ytNum(d.likes);
+  $('ov-comments').textContent = ytNum(d.comments);
+  $('ov-shares').textContent   = 'Condividi';
+  $('ov-saves').textContent    = 'Non mi piace';
   var av = $('ov-av');
   av.textContent = d.initials;
   av.style.background = 'linear-gradient(135deg,'+d.c1+','+d.c2+')';
+  var sb = $('ov-soundbox');
+  if (sb){ sb.textContent = d.initials; sb.style.background = 'linear-gradient(135deg,'+d.c1+','+d.c2+')'; }
+  var pf = $('yt-progress-fill'); if (pf) pf.style.width='0%';
   // reset stato like e pausa al cambio reel
   $('like-btn').classList.remove('liked');
   if (_paused){ _paused=false; $('pause-icon').classList.remove('show'); }
@@ -886,30 +995,92 @@ function activateVideo(slide){
     vid = document.createElement('video');
     vid.className = 'slide-vid';
     vid.muted = true; vid.loop = true; vid.playsInline = true;
-    vid.setAttribute('playsinline',''); vid.setAttribute('webkit-playsinline','');
+    vid.setAttribute('muted',''); vid.setAttribute('playsinline',''); vid.setAttribute('webkit-playsinline','');
     vid.setAttribute('preload','auto');
     var baseUrl = slide.dataset.vidurl;
-    var triedAlt = false;
-    // Robustezza percorso: se non trova il video dove indicato, prova l'altra
-    // posizione (accanto all'index OPPURE in cartella video/). Così funziona
-    // ovunque tu abbia caricato i file. Solo dopo entrambi → resta il gradiente.
+    // Percorsi da provare in ordine. Robustezza: se non trova il video dove
+    // indicato, prova l'altra posizione (accanto all'index oppure in video/).
+    // Per i reel del tastierino prova prima il video dedicato e, se non esiste
+    // ancora, ricade sul video normale. Solo dopo tutti → resta il gradiente.
+    var alt = function(u){ return (u.indexOf('video/')===0) ? u.replace('video/','') : ('video/'+u); };
+    var cands = [];
+    if (slide.dataset.kpurl){
+      var kres = _kpUrl[+slide.dataset.kp];             // esito della verifica fatta all'avvio
+      if (typeof kres === 'string') cands.push(kres);   // esiste: vado dritto
+      else if (kres !== false) cands.push(slide.dataset.kpurl, alt(slide.dataset.kpurl)); // non ancora verificato
+      // se è false (non esiste) salto direttamente al video normale
+    }
+    cands.push(baseUrl, alt(baseUrl));
+    var ci = 0;
     vid.addEventListener('error', function(){
-      if (!triedAlt){
-        triedAlt = true;
+      ci++;
+      if (ci < cands.length){
         vid.classList.remove('failed');
-        vid.src = (baseUrl.indexOf('video/')===0) ? baseUrl.replace('video/','') : ('video/'+baseUrl);
+        vid.src = cands[ci];
+        try { vid.load(); } catch(e){}                   // Safari: ripartenza esplicita dopo un errore
         vid.play().catch(function(){});
       } else {
         vid.classList.add('failed');
       }
     });
     vid.addEventListener('canplay', function(){ vid.classList.add('ready'); }, { once:true });
-    vid.src = baseUrl;
+    // barra di avanzamento rossa (solo per il video attivo)
+    vid.addEventListener('timeupdate', function(){
+      var f = $('yt-progress-fill');
+      if (f && vid.duration) f.style.width = Math.min(100, vid.currentTime/vid.duration*100) + '%';
+    });
+    vid.src = cands[0];
     slide.insertBefore(vid, slide.querySelector('.slide-vignette'));
   }
   var p = vid.play();
   if (p && p.then) p.then(function(){ vid.classList.add('ready'); }).catch(function(){});
 }
+// ── Verifica all'avvio dei video del tastierino ────────────────────────
+// Una richiesta leggera per file: se esiste ricordo dove, se no lo salto.
+// Evita ai reel 5 e 6 di passare da due errori a ogni visita.
+var _kpUrl = [null, null];   // null = non ancora verificato, false = non esiste, stringa = percorso buono
+function probeKeypadVideos(){
+  if (!CONFIG.keypadVideos || typeof fetch !== 'function') return;
+  CONFIG.keypadVideos.forEach(function(u, i){
+    var alt = (u.indexOf('video/')===0) ? u.replace('video/','') : ('video/'+u);
+    fetch(u, { method:'HEAD', cache:'no-store' }).then(function(r){
+      if (r.ok){ _kpUrl[i] = u; return; }
+      return fetch(alt, { method:'HEAD', cache:'no-store' }).then(function(r2){ _kpUrl[i] = r2.ok ? alt : false; });
+    }).catch(function(){ /* rete assente: lascio null, la catena normale se la cava */ });
+  });
+}
+
+// ── Precaricamento dei reel successivi ────────────────────────────────
+// I file sono piccoli: scaricarli in cache prima che servano evita di vedere
+// lo sfondo vuoto al passaggio da un reel all'altro.
+var _prefetched = {};
+function prefetchVideo(slide){
+  if (!slide || !CONFIG.videosEnabled || typeof fetch !== 'function') return;
+  var u = slide.dataset.vidurl;
+  if (slide.dataset.kpurl && typeof _kpUrl[+slide.dataset.kp] === 'string') u = _kpUrl[+slide.dataset.kp];
+  if (!u || _prefetched[u]) return;
+  _prefetched[u] = 1;
+  try { fetch(u, { cache:'force-cache' }).catch(function(){}); } catch(e){}
+}
+
+// ── Sblocco del video al primo tocco ──────────────────────────────────
+// Su iPhone (soprattutto in risparmio energetico) i video non partono da
+// soli finché l'utente non tocca lo schermo. Al primo contatto, se il video
+// corrente è fermo e NON è stato messo in pausa di proposito, lo faccio partire.
+var _kickedAt = 0;   // quando un tocco è servito a sbloccare il video, non conta come pausa
+function kickVideo(){
+  if (typeof _paused !== 'undefined' && _paused) return;
+  var s = (typeof _activeSlide !== 'undefined') ? _activeSlide : null;
+  if (!s) return;
+  var v = s.querySelector('.slide-vid');
+  if (!v){ activateVideo(s); _kickedAt = Date.now(); return; }
+  if (v.paused){
+    _kickedAt = Date.now();
+    var p = v.play();
+    if (p && p.then) p.then(function(){ v.classList.add('ready'); }).catch(function(){});
+  }
+}
+
 function deactivateVideo(slide, unload){
   var vid = slide.querySelector('.slide-vid');
   if (!vid) return;
@@ -956,6 +1127,7 @@ function mountFeed(videos, onArrive){
         if (i === idx) activateVideo(ch[i]);  // SOLO il reel attivo ha il video
         else deactivateVideo(ch[i], true);    // tutti gli altri: video rimosso
       }
+      prefetchVideo(ch[idx+1]); prefetchVideo(ch[idx+2]);   // i prossimi due, in cache
     }, 130);
   }
 
@@ -998,15 +1170,22 @@ function mountFeed(videos, onArrive){
     },
     // COINCIDENZA: rimuove le slide dalla posizione di coincidenza in poi e
     // attacca i reel condivisi (identici per mago e spettatore via seed).
-    patch: function(fromIdx, count, condivisi, oddOne){
+    patch: function(fromIdx, count, condivisi, oddOne, filler){
       var coincAbs = fromIdx + count - 1;
       var all = Array.prototype.slice.call(slidesEl.children);
       for (var i=coincAbs;i<all.length;i++){ io.unobserve(all[i]); all[i].remove(); }
-      // Sequenza dei reel da qui in poi (per l'effetto scenico):
+      var seq = [];
+      // Numeri grandi: se la coincidenza cade oltre la fine del feed, allungo con
+      // reel di riempimento del PROPRIO gruppo (mai in comune con l'altro telefono)
+      // fino alla posizione esatta, così il conto dei reel resta corretto.
+      if (filler && filler.length){
+        for (var g=all.length; g<coincAbs; g++) seq.push(filler[(g-all.length) % filler.length]);
+      }
+      // Sequenza dei reel dalla coincidenza in poi (per l'effetto scenico):
       //  • coincAbs    = primo reel condiviso  → COINCIDE  ("esattamente questo numero")
       //  • coincAbs+1  = reel DIVERSO (oddOne)  → non coincide ("non uno dopo…")
       //  • coincAbs+2… = resto dei condivisi    → tornano a combaciare ("schiocco le dita")
-      var seq = [ condivisi[0] ];
+      seq.push(condivisi[0]);
       if (oddOne) seq.push(oddOne);
       for (var j=1;j<condivisi.length;j++) seq.push(condivisi[j]);
       for (var k=0;k<seq.length;k++){
@@ -1077,15 +1256,21 @@ function isOverlayTarget(t){
 }
 function bindFeedTaps(){
   var c = $('feed-container');
-  function handleTap(target){
+  function handleTap(target, x, y){
     if (isOverlayTarget(target)) return;
     var now = Date.now();
     if (now - _lastTap < 300){           // doppio tap → like
       clearTimeout(_tapTimer); _lastTap = 0;
       doLike();
-    } else {                              // tap singolo → pausa (dopo 300ms)
+    } else {                              // tap singolo (dopo 300ms, per distinguerlo dal doppio)
       _lastTap = now;
-      _tapTimer = setTimeout(function(){ togglePause(); }, 300);
+      _tapTimer = setTimeout(function(){
+        // Tastierino a tocco (solo mago, solo sui reel previsti): se il tocco
+        // è servito come cifra, non metto in pausa.
+        if (_kpTap && _kpTap(x, y)) return;
+        if (Date.now() - _kickedAt < 1200) return;   // il tocco ha appena sbloccato il video: niente pausa
+        togglePause();
+      }, 300);
     }
   }
   var touch = ('ontouchstart' in window || navigator.maxTouchPoints>0);
@@ -1100,10 +1285,11 @@ function bindFeedTaps(){
     }, { passive:true });
     c.addEventListener('touchend', function(e){
       if (moved) return;                  // era uno scroll, non un tap
-      handleTap(e.target);
+      var t = e.changedTouches && e.changedTouches[0];
+      handleTap(e.target, t ? t.clientX : sx, t ? t.clientY : sy);
     }, { passive:true });
   } else {
-    c.addEventListener('click', function(e){ handleTap(e.target); });
+    c.addEventListener('click', function(e){ handleTap(e.target, e.clientX, e.clientY); });
   }
 }
 
@@ -1263,38 +1449,109 @@ function showCodeScreen(code){
 function initMagoFeed(code){
   showView('view-feed');
   var topic = codeToTopic(code);
-  var mVids = seededShuffle(MAGO_POOL, magoSeed(code)).slice(0, CONFIG.feedMagoUnique);
+  var mAll  = seededShuffle(MAGO_POOL, magoSeed(code));
+  var mVids = mAll.slice(0, CONFIG.feedMagoUnique);
+  // riserva per i numeri grandi: prima i reel non ancora usati, poi da capo
+  var mFill = mAll.slice(CONFIG.feedMagoUnique).concat(mAll.slice(0, CONFIG.feedMagoUnique));
   var cBase = seededShuffle(CONDIVISI_POOL, condivisiSeed(code));
+  var cOff = Math.abs(condivisiSeed(code)) % 97;          // scostamento legato al codice (uguale sui due telefoni)
+  cBase.forEach(function(v,i){ v._ci=i+cOff; });
   var cVids = cBase.concat(cBase).slice(0, CONFIG.feedShared);
-  mVids.forEach(function(v){ v._vp='M'; });   // reel del mago → sfondi caldi
+  mAll.forEach(function(v){ v._vp='M'; });    // reel del mago → sfondi caldi
   cVids.forEach(function(v){ v._vp='C'; });   // reel condivisi → sfondi coincidenza
   var videos = mVids.slice(); for (var i=0;i<CONFIG.feedMixIn;i++) videos.push(cVids[i]);
 
+  // I due reel del tastierino (solo nel feed del mago): decine e unità
+  var kpIdx = [CONFIG.keypadReels[0]-1, CONFIG.keypadReels[1]-1];
+  if (videos[kpIdx[0]]) videos[kpIdx[0]]._kp = 0;
+  if (videos[kpIdx[1]]) videos[kpIdx[1]]._kp = 1;
+
   var armed=false, selectedNum=null, coincIdx=null, flashed=false, idleTimer=null;
-  var dot = $('mago-dot');
-  dot.style.display='none';
+  var dot = $('mago-dot');   // il triangolino bianco dentro il logo in alto a sinistra
+  // Stati della spia: 'off' = triangolino normale, 'blink' = armato (conto alla
+  // rovescia), 'ready' = coincidenza pronta (triangolino attenuato, fisso).
+  function spy(state){
+    dot.classList.remove('spy-blink','spy-ready');
+    dot.style.opacity='';
+    if (state==='blink') dot.classList.add('spy-blink');
+    else if (state==='ready') dot.classList.add('spy-ready');
+  }
+  spy('off');
 
   var feed = mountFeed(videos, function(i){
     if (armed) resetIdle();
     if (coincIdx!==null && i>=coincIdx && !flashed){ flashed=true; hideDot(); }
   });
 
-  function hideDot(){ clearTimeout(idleTimer); dot.style.display='none'; dot.classList.remove('blinking'); }
+  function hideDot(){ clearTimeout(idleTimer); spy('off'); }
   function resetIdle(){
     clearTimeout(idleTimer);
-    dot.style.display='block'; dot.classList.add('blinking');
+    spy('blink');
     idleTimer = setTimeout(doActivate, CONFIG.idleActivate);
   }
   function doActivate(){
     if (!armed || selectedNum===null) return;
     armed=false;
-    dot.classList.remove('blinking'); dot.style.display='block';
+    spy('ready');
     var fromIdx = feed.getIdx();
     coincIdx = fromIdx + selectedNum - 1;
     // reel "diverso" del mago: sfondo caldo, numero 1-20 (≠ da quello dello spettatore)
-    feed.patch(fromIdx, selectedNum, cVids, mVids[mVids.length-1]);
+    feed.patch(fromIdx, selectedNum, cVids, mVids[mVids.length-1], mFill);
     ntfySend(topic, { type:'activate', n:selectedNum, ts:Date.now() });
   }
+
+  // ── Tastierino a tocco ──────────────────────────────────────────────
+  // Sul reel delle decine un tocco imposta la prima cifra, su quello delle
+  // unità la seconda. Quando il numero è completo e valido, arma la
+  // coincidenza esattamente come il pulsante del pannello. Ritoccare una
+  // cifra ricalcola il numero. Il pallino dà la conferma: un lampeggio breve
+  // per una cifra, lampeggio continuo quando è armato, doppio se non valido.
+  var kpTens=null, kpUnits=null, blipT=null;
+  function kpDigitAt(fx, fy){
+    var r = CONFIG.keypadRows;
+    if (fy < r[0]) return null;                          // fascia alta: ignoro
+    if (fy >= r[3]) return 0;                            // riga dello zero
+    var row = (fy < r[1]) ? 0 : (fy < r[2]) ? 1 : 2;
+    var col = (fx < 1/3) ? 0 : (fx < 2/3) ? 1 : 2;
+    return row*3 + col + 1;
+  }
+  function blip(times){
+    if (armed) return;                                   // sta già lampeggiando
+    var n = times||1, k = 0;
+    clearTimeout(blipT); spy('off');
+    (function step(){                                    // il triangolino si spegne e riaccende
+      dot.style.opacity = (k%2===0) ? '0.06' : '1';
+      k++;
+      if (k < n*2) blipT = setTimeout(step, 260); else dot.style.opacity='';
+    })();
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch(e){}
+  }
+  function kpSync(){
+    if (kpUnits===null){ blip(1); return; }              // solo decine: conferma breve
+    var n = (kpTens||0)*10 + kpUnits;
+    if (n < 1 || n > CONFIG.keypadMax){                  // numero non valido
+      if (armed){ armed=false; hideDot(); }
+      blip(2); return;
+    }
+    selectedNum = n;                                     // come dal pannello
+    var bs = document.querySelectorAll('.num-btn');
+    for (var k=0;k<bs.length;k++) bs[k].classList.toggle('sel', parseInt(bs[k].textContent,10)===n);
+    $('activate-btn').disabled = false;
+    armed = true; resetIdle();
+    try { if (navigator.vibrate) navigator.vibrate([15,60,15]); } catch(e){}
+  }
+  _kpTap = function(x, y){
+    if (coincIdx!==null) return false;                   // già scattata: non serve più
+    var idx = feed.getIdx();
+    var pos = (idx===kpIdx[0]) ? 0 : (idx===kpIdx[1]) ? 1 : -1;
+    if (pos < 0) return false;                           // non è un reel del tastierino
+    var rc = $('feed-container').getBoundingClientRect();
+    var d = kpDigitAt((x-rc.left)/rc.width, (y-rc.top)/rc.height);
+    if (d===null) return true;                           // zona morta: né cifra né pausa
+    if (pos===0) kpTens=d; else kpUnits=d;
+    kpSync();
+    return true;
+  };
 
   // pannello regia
   var pc=$('panel-code-display'); pc.innerHTML='';
@@ -1303,7 +1560,7 @@ function initMagoFeed(code){
   if (_spettJoined) $('panel-dot').classList.add('live');
 
   var grid=$('num-grid'); grid.innerHTML='';
-  for (var n=1;n<=50;n++){
+  for (var n=1;n<=CONFIG.keypadMax;n++){
     (function(num){
       var b=document.createElement('button'); b.className='num-btn'; b.textContent=num;
       b.onclick=function(){
@@ -1314,7 +1571,7 @@ function initMagoFeed(code){
     })(n);
   }
   $('activate-btn').disabled=true;
-  $('activate-btn').onclick=function(){ if(!selectedNum)return; armed=true; closePanel(); resetIdle(); };
+  $('activate-btn').onclick=function(){ if(!selectedNum)return; kpTens=null; kpUnits=null; armed=true; closePanel(); resetIdle(); };
 
   function openPanel(){ $('control-panel').classList.add('open'); }
   function closePanel(){ $('control-panel').classList.remove('open'); }
@@ -1339,10 +1596,14 @@ function initMagoFeed(code){
 function initSpettFeed(code){
   showView('view-feed');
   var topic = codeToTopic(code);
-  var sVids = seededShuffle(SPETT_POOL, spettSeed(code)).slice(0, CONFIG.feedSpettUnique);
+  var sAll  = seededShuffle(SPETT_POOL, spettSeed(code));
+  var sVids = sAll.slice(0, CONFIG.feedSpettUnique);
+  var sFill = sAll.slice(CONFIG.feedSpettUnique).concat(sAll.slice(0, CONFIG.feedSpettUnique));
   var cBase = seededShuffle(CONDIVISI_POOL, condivisiSeed(code));
+  var cOff = Math.abs(condivisiSeed(code)) % 97;          // scostamento legato al codice (uguale sui due telefoni)
+  cBase.forEach(function(v,i){ v._ci=i+cOff; });
   var cVids = cBase.concat(cBase).slice(0, CONFIG.feedShared);
-  sVids.forEach(function(v){ v._vp='S'; });   // reel spettatore → sfondi freddi
+  sAll.forEach(function(v){ v._vp='S'; });   // reel spettatore → sfondi freddi
   cVids.forEach(function(v){ v._vp='C'; });   // reel condivisi → sfondi coincidenza
   var videos = sVids.slice(); for (var i=0;i<CONFIG.feedMixIn;i++) videos.push(cVids[i]);
 
@@ -1370,7 +1631,7 @@ function initSpettFeed(code){
       activated=true;
       var fromIdx = feed.getIdx();
       // reel "diverso" dello spettatore: sfondo freddo, numero 21-40 (≠ da quello del mago)
-      feed.patch(fromIdx, msg.n, cVids, sVids[sVids.length-1]);
+      feed.patch(fromIdx, msg.n, cVids, sVids[sVids.length-1], sFill);
     }
   });
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) sub.reconnect(); });
@@ -1393,12 +1654,22 @@ function goFullscreen(){
   // Android Chrome: schermo intero vero. iPhone non lo supporta (usa viewport-fit).
   var el = document.documentElement;
   var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-  if (req){ try { req.call(el); } catch(e){} }
+  if (req){
+    try {
+      var r = req.call(el);
+      if (r && typeof r.catch === 'function') r.catch(function(){});  // rifiuto silenzioso (es. senza gesto valido)
+    } catch(e){}
+  }
 }
 
 function initApp(){
-  bindFeedTaps();
-  bindSidebar();
+  // La schermata iniziale se ne va comunque, qualunque cosa succeda dopo.
+  setTimeout(splashGo, 2600);
+  try { bindFeedTaps(); bindSidebar(); } catch(e){ reportErr(e); }
+  probeKeypadVideos();
+  document.addEventListener('touchstart', kickVideo, { passive:true });
+  document.addEventListener('touchend', kickVideo, { passive:true });   // Safari riconosce il gesto qui
+  document.addEventListener('click', kickVideo);
 
   // ── Blocco del doppio-tap zoom su iPhone (vale per mago E spettatore) ──
   // touch-action da solo a volte non basta su iOS: qui annullo esplicitamente
@@ -1448,7 +1719,6 @@ function initApp(){
 
   var sp=$('splash');
   if (sp){ sp.addEventListener('click', splashGo); sp.addEventListener('touchend', splashGo); }
-  setTimeout(splashGo, 2600);
 
   var p = new URLSearchParams(location.search);
   var m = (p.get('m')||'').toUpperCase().trim();
@@ -1458,8 +1728,27 @@ function initApp(){
   else initMagoHome();
 }
 
+// ── Errori a schermo ──────────────────────────────────────────────────
+// Su iPhone non c'è una console: se qualcosa va storto, l'errore compare in
+// un riquadro rosso in alto (tocca per chiudere). In uso normale non appare mai.
+function reportErr(e, where){
+  try {
+    var msg = (e && e.message ? e.message : String(e)) + (where ? ' @ '+where : '');
+    var box = document.getElementById('err-box');
+    if (!box){
+      box = document.createElement('div'); box.id='err-box';
+      box.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(8px + env(safe-area-inset-top));z-index:9999;background:#b00020;color:#fff;font:12px/1.4 -apple-system,monospace;padding:10px 12px;border-radius:8px;white-space:pre-wrap;word-break:break-word';
+      box.addEventListener('click', function(){ box.remove(); });
+      document.body.appendChild(box);
+    }
+    box.textContent = 'Errore: ' + msg;
+    var sp = document.getElementById('splash'); if (sp) sp.classList.add('hide');
+  } catch(_){}
+}
+window.addEventListener('error', function(ev){ reportErr(ev.error || ev.message, 'riga '+ev.lineno); });
+
 // lo script è in fondo al body → il DOM sopra è già pronto
-initApp();
+try { initApp(); } catch(e){ reportErr(e, 'avvio'); }
 
 </script>
 </body>
