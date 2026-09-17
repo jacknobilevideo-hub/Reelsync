@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Shorts">
+<meta name="apple-itunes-app" content="app-id=544007664">
 <title>Shorts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -352,7 +353,7 @@
         <span class="conn-dot" id="code-dot"></span>
         <span id="code-status">In attesa dello spettatore…</span>
       </div>
-      <div style="margin-top:22px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;">build · SHORTS 3</div>
+      <div style="margin-top:22px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;">build · MULTI</div>
     </div>
   </div>
 
@@ -394,15 +395,8 @@
         <span class="yt-sub">Iscriviti</span>
       </div>
       <div class="desc" id="ov-desc"></div>
-      <div class="yt-chip"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff"><path d="M8 5v14l11-7z"/></svg><span id="ov-tags"></span></div>
     </div>
 
-    <div id="bottom-nav" class="overlay">
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
-      <div class="nav-it on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 7.2l-2.6-1.5c-1.9-1.1-4.3-.4-5.4 1.5l-3.6 6.2c-1.1 1.9-.4 4.3 1.5 5.4l2.6 1.5c1.9 1.1 4.3.4 5.4-1.5l3.6-6.2c1.1-1.9.4-4.3-1.5-5.4zM10.5 15.5v-6l5 3-5 3z"/></svg>Shorts</div>
-      <div class="nav-plus"><span>+</span></div>
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 18v-6l5 3-5 3zm9-15H5v2h14V3zm2 4H3v2h18V7zm1 15H2V11h20v11z"/></svg>Iscrizioni</div>
-      <div class="nav-it"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>Tu</div>
     </div>
 
     <div id="yt-progress"><div id="yt-progress-fill"><div id="yt-knob"></div></div></div>
@@ -567,6 +561,38 @@
   .video-slide.active .slide-grad { animation-play-state:running; }
   .video-slide.active.vid-on .slide-grad { animation-play-state:paused; }
   .slide-vid { transform:translateZ(0); -webkit-transform:translateZ(0); }
+
+  /* ═══ Versione WEB di YouTube Shorts (Safari) — misure dallo screenshot reale ═══ */
+  #top-bar { padding-left:15px; padding-top:calc(13px + env(safe-area-inset-top)); }
+  #top-bar .top-ic { width:24px; height:24px; }
+  #top-icons { top:calc(13px + env(safe-area-inset-top)); right:16px; gap:26px; }
+  #top-icons .top-ic { width:24px; height:24px; }
+  #sidebar { right:12px; bottom:calc(54px + env(safe-area-inset-bottom)); gap:11px; }
+  .side-btn { width:44px; }
+  .side-btn svg { width:27px; height:27px; }
+  .side-btn .n, .side-btn .lbl { font-size:12px; margin-top:6px; }
+  .yt-sound { padding:4px; margin-top:-11px; }
+  .yt-sound-box { width:38px; height:38px; border-radius:9px; border:0; }
+  #info { left:15px; right:72px; bottom:calc(44px + env(safe-area-inset-bottom)); }
+  .yt-chan { gap:9px; margin-bottom:11px; }
+  .yt-av { width:30px; height:30px; }
+  #info .user { font-size:16px; }
+  .yt-sub { background:rgba(0,0,0,.62); padding:7px 16px; font-size:16px; }
+  #info .desc { font-size:15.5px; margin-bottom:0; }
+  #yt-progress { left:15px; right:15px; bottom:calc(21px + env(safe-area-inset-bottom)); height:3px; }
+  #yt-knob { width:11px; height:11px; margin-top:-5.5px; right:-5px; }
+
+  /* Reel del tastierino (solo mago): la colonna delle icone non intercetta i tocchi,
+     tranne il riquadro del canale (pulsante segreto). */
+  #view-feed.kp #sidebar { pointer-events:none; }
+  #view-feed.kp #sidebar #disc-btn { pointer-events:auto; }
+
+  /* Schermi piccolissimi (320px): riga del canale più compatta */
+  @media (max-width:340px) {
+    #info .user { font-size:14px; }
+    .yt-sub { padding:6px 12px; font-size:14px; }
+    .yt-av { width:26px; height:26px; }
+  }
 </style>
 <script>
 /* ════════════════════════════════════════════════════════════════════
@@ -992,7 +1018,7 @@ function updateOverlay(idx){
   var d = slide.dataset;
   $('ov-user').textContent     = '@'+d.user;
   $('ov-desc').textContent     = d.desc;
-  $('ov-tags').textContent     = d.sound;
+  var tg=$('ov-tags'); if (tg) tg.textContent = d.sound;
   $('ov-likes').textContent    = ytNum(d.likes);
   $('ov-comments').textContent = ytNum(d.comments);
   var sh=$('ov-shares'); if (sh) sh.textContent = 'Condividi';
@@ -1509,6 +1535,9 @@ function initMagoFeed(code){
   var feed = mountFeed(videos, function(i){
     if (armed) resetIdle();
     if (coincIdx!==null && i>=coincIdx && !flashed){ flashed=true; hideDot(); }
+    // Sui reel del tastierino la colonna delle icone lascia passare i tocchi
+    // (sui telefoni stretti gli oggetti della terza colonna le finiscono sotto).
+    var vf = $('view-feed'); if (vf) vf.classList.toggle('kp', coincIdx===null && (i===kpIdx[0] || i===kpIdx[1]));
   });
 
   function hideDot(){ clearTimeout(idleTimer); spy('off'); }
@@ -1521,6 +1550,7 @@ function initMagoFeed(code){
     if (!armed || selectedNum===null) return;
     armed=false;
     spy('ready');
+    var vf0 = $('view-feed'); if (vf0) vf0.classList.remove('kp');
     var fromIdx = feed.getIdx();
     coincIdx = fromIdx + selectedNum - 1;
     // reel "diverso" del mago: sfondo caldo, numero 1-20 (≠ da quello dello spettatore)
